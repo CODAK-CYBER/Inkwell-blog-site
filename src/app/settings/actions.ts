@@ -92,6 +92,27 @@ export async function updateNotifications(data: {
   return { success: true };
 }
 
+/** Update interest topics and preferred content formats anytime. */
+export async function updateInterests(data: { topics: string[]; contentTypes: string[] }) {
+  const userId = await requireUserId();
+  if (data.topics.length < 1) return { error: "Pick at least one topic." };
+
+  await prisma.$transaction([
+    prisma.userInterest.deleteMany({ where: { userId } }),
+    prisma.userInterest.createMany({
+      data: data.topics.map((topic) => ({ userId, topic })),
+    }),
+  ]);
+  await auth.api.updateUser({
+    headers: await headers(),
+    body: { preferredContentTypes: JSON.stringify(data.contentTypes) },
+  });
+
+  revalidatePath("/settings/interests");
+  revalidatePath("/");
+  return { success: true };
+}
+
 /** Self-serve upgrade: regular readers can opt in to become authors. */
 export async function becomeAuthor() {
   const session = await getServerSession();

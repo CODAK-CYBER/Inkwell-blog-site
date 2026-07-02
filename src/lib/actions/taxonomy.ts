@@ -90,6 +90,79 @@ export async function deleteCategory(id: string) {
   return { success: true };
 }
 
+// ---------------- Collections ----------------
+
+export interface CollectionInput {
+  name: string;
+  slug?: string;
+  description?: string;
+  coverImage?: string;
+  featured?: boolean;
+}
+
+export async function saveCollection(input: CollectionInput, id?: string) {
+  const session = await requireCategoryManager();
+  const name = input.name.trim();
+  if (!name) return { error: "Name is required." };
+  const slug = slugify(input.slug || name);
+  const data = {
+    name,
+    slug,
+    description: input.description?.trim() || null,
+    coverImage: input.coverImage?.trim() || null,
+    featured: input.featured ?? false,
+  };
+  try {
+    if (id) await prisma.collection.update({ where: { id }, data });
+    else await prisma.collection.create({ data });
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
+      return { error: "A collection with that slug already exists." };
+    }
+    throw err;
+  }
+  await logActivity({
+    userId: session.user.id,
+    action: id ? "collection.updated" : "collection.created",
+    targetType: "collection",
+    detail: name,
+  });
+  revalidatePath("/admin/collections");
+  revalidatePath("/collections");
+  return { success: true };
+}
+
+export async function deleteCollection(id: string) {
+  const session = await requireCategoryManager();
+  const collection = await prisma.collection.delete({ where: { id } });
+  await logActivity({
+    userId: session.user.id,
+    action: "collection.deleted",
+    targetType: "collection",
+    detail: collection.name,
+  });
+  revalidatePath("/admin/collections");
+  revalidatePath("/collections");
+  return { success: true };
+}
+
+export async function toggleArticleInCollection(collectionId: string, articleId: string) {
+  await requireCategoryManager();
+  const existing = await prisma.collectionItem.findUnique({
+    where: { collectionId_articleId: { collectionId, articleId } },
+  });
+  if (existing) {
+    await prisma.collectionItem.delete({
+      where: { collectionId_articleId: { collectionId, articleId } },
+    });
+  } else {
+    await prisma.collectionItem.create({ data: { collectionId, articleId } });
+  }
+  revalidatePath("/admin/collections");
+  revalidatePath("/collections");
+  return { added: !existing };
+}
+
 export async function createTag(name: string) {
   const session = await requireCategoryManager();
   const clean = name.trim();

@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, KeyRound, Shield, User, UserCog } from "lucide-react";
+import { Bell, Heart, KeyRound, Shield, User, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { label: "Profile", href: "/settings", Icon: User },
+  { label: "Interests", href: "/settings/interests", Icon: Heart },
   { label: "Account", href: "/settings/account", Icon: UserCog },
   { label: "Security", href: "/settings/security", Icon: KeyRound },
   { label: "Notifications", href: "/settings/notifications", Icon: Bell },

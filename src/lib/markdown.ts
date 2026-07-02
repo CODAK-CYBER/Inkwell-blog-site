@@ -1,12 +1,39 @@
-import { marked } from "marked";
+import { marked, Renderer, type Tokens } from "marked";
 import DOMPurify from "isomorphic-dompurify";
+import { slugify } from "@/lib/utils";
 
 marked.setOptions({ gfm: true, breaks: true });
 
+// Give headings stable ids so the table of contents can anchor to them.
+const renderer = new Renderer();
+renderer.heading = function ({ tokens, depth }: Tokens.Heading) {
+  const text = this.parser.parseInline(tokens);
+  const id = slugify(text.replace(/<[^>]+>/g, ""));
+  return `<h${depth} id="${id}">${text}</h${depth}>\n`;
+};
+
 /** Markdown → sanitized HTML. Safe for user-authored content. */
 export function renderMarkdown(md: string): string {
-  const raw = marked.parse(md, { async: false });
+  const raw = marked.parse(md, { async: false, renderer });
   return DOMPurify.sanitize(raw, {
-    ADD_ATTR: ["target", "rel"],
+    ADD_ATTR: ["target", "rel", "id"],
   });
+}
+
+export interface Heading {
+  id: string;
+  text: string;
+  depth: number;
+}
+
+/** Extract h2/h3 headings for the table of contents. */
+export function extractHeadings(md: string): Heading[] {
+  return marked
+    .lexer(md)
+    .filter((t): t is Tokens.Heading => t.type === "heading" && (t.depth === 2 || t.depth === 3))
+    .map((t) => ({
+      id: slugify(t.text.replace(/<[^>]+>/g, "")),
+      text: t.text,
+      depth: t.depth,
+    }));
 }

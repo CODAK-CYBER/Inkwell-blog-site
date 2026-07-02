@@ -16,15 +16,18 @@ export const siteConfig = {
   nav: [
     { label: "Home", href: "/" },
     { label: "Articles", href: "/articles" },
+    { label: "Trending", href: "/trending" },
     { label: "Categories", href: "/categories" },
+    { label: "Authors", href: "/authors" },
     { label: "About", href: "/about" },
-    { label: "Contact", href: "/contact" },
   ],
   footerNav: {
     explore: [
       { label: "Latest Articles", href: "/articles" },
       { label: "Categories", href: "/categories" },
-      { label: "Trending", href: "/articles?sort=trending" },
+      { label: "Trending", href: "/trending" },
+      { label: "Collections", href: "/collections" },
+      { label: "Authors", href: "/authors" },
       { label: "Search", href: "/search" },
     ],
     company: [

@@ -5,19 +5,25 @@ import { siteConfig } from "@/lib/site";
 import { getServerSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { getLiveArticles, liveWhere, toCardModel } from "@/lib/articles";
-import { TOPICS } from "@/lib/constants";
 import { Container } from "@/components/ui/container";
 import { buttonVariants, Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ArticleCard } from "@/components/articles/article-card";
+import { PersonalizedHome } from "@/components/home/personalized-home";
 
 export default async function HomePage() {
   // Signed-in users finish onboarding before seeing the homepage.
   const session = await getServerSession();
   if (session && !session.user.onboardingComplete) redirect("/onboarding");
 
-  const [featured, latestAll, categories, interests] = await Promise.all([
+  // Logged-in readers get the fully personalized homepage.
+  if (session) {
+    return <PersonalizedHome userId={session.user.id} userName={session.user.name} />;
+  }
+
+  // Guest homepage
+  const [featured, latestAll, categories] = await Promise.all([
     getLiveArticles({ featured: true, take: 2 }),
     getLiveArticles({ take: 8 }),
     prisma.category.findMany({
@@ -26,38 +32,13 @@ export default async function HomePage() {
       take: 6,
       include: { _count: { select: { articles: { where: liveWhere() } } } },
     }),
-    session
-      ? prisma.userInterest.findMany({ where: { userId: session.user.id } })
-      : Promise.resolve([]),
   ]);
 
   const featuredIds = new Set(featured.map((a) => a.id));
   const latest = latestAll.filter((a) => !featuredIds.has(a.id)).slice(0, 6);
 
-  const interestTopics = interests
-    .map((i) => TOPICS.find((t) => t.slug === i.topic))
-    .filter((t): t is (typeof TOPICS)[number] => Boolean(t));
-
   return (
     <>
-      {/* Your topics (personalized feed lands in Phase 3) */}
-      {session && interestTopics.length > 0 && (
-        <section className="border-b bg-accent-soft/40">
-          <Container className="flex flex-wrap items-center gap-2 py-3">
-            <span className="text-sm font-medium text-muted-foreground">Your topics:</span>
-            {interestTopics.map((topic) => (
-              <Link
-                key={topic.slug}
-                href={`/categories/${topic.slug}`}
-                className="rounded-full border bg-background px-3 py-1 text-sm transition-colors hover:border-accent hover:text-accent"
-              >
-                {topic.emoji} {topic.label}
-              </Link>
-            ))}
-          </Container>
-        </section>
-      )}
-
       {/* Hero */}
       <section className="border-b bg-card">
         <Container className="py-16 text-center sm:py-24">

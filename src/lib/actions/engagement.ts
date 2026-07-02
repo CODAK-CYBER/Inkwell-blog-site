@@ -49,6 +49,72 @@ export async function recordReading(articleSlug: string, progress = 0) {
   });
 }
 
+// ---------------- Reading lists ----------------
+
+export async function createReadingList(name: string, description?: string) {
+  const userId = await requireUserId();
+  const clean = name.trim();
+  if (!clean) return { error: "Give your list a name." };
+  const list = await prisma.readingList.create({
+    data: { userId, name: clean, description: description?.trim() || null },
+  });
+  revalidatePath("/saved");
+  return { id: list.id };
+}
+
+export async function renameReadingList(listId: string, name: string) {
+  const userId = await requireUserId();
+  const clean = name.trim();
+  if (!clean) return { error: "Give your list a name." };
+  await prisma.readingList.update({
+    where: { id: listId, userId },
+    data: { name: clean },
+  });
+  revalidatePath("/saved");
+  return { success: true };
+}
+
+export async function deleteReadingList(listId: string) {
+  const userId = await requireUserId();
+  // Bookmarks survive (listId set null via relation onDelete: SetNull)
+  await prisma.readingList.delete({ where: { id: listId, userId } });
+  revalidatePath("/saved");
+  return { success: true };
+}
+
+export async function moveBookmarkToList(bookmarkId: string, listId: string | null) {
+  const userId = await requireUserId();
+  if (listId) {
+    const list = await prisma.readingList.findFirst({ where: { id: listId, userId } });
+    if (!list) return { error: "List not found." };
+  }
+  await prisma.bookmark.update({
+    where: { id: bookmarkId, userId },
+    data: { listId },
+  });
+  revalidatePath("/saved");
+  return { success: true };
+}
+
+export async function toggleArchiveBookmark(bookmarkId: string) {
+  const userId = await requireUserId();
+  const bookmark = await prisma.bookmark.findFirst({ where: { id: bookmarkId, userId } });
+  if (!bookmark) return { error: "Bookmark not found." };
+  await prisma.bookmark.update({
+    where: { id: bookmarkId },
+    data: { archived: !bookmark.archived },
+  });
+  revalidatePath("/saved");
+  return { archived: !bookmark.archived };
+}
+
+export async function removeBookmark(bookmarkId: string) {
+  const userId = await requireUserId();
+  await prisma.bookmark.delete({ where: { id: bookmarkId, userId } });
+  revalidatePath("/saved");
+  return { success: true };
+}
+
 export async function toggleFollow(targetType: "author" | "category" | "tag", targetKey: string) {
   const userId = await requireUserId();
   const existing = await prisma.follow.findUnique({

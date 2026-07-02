@@ -57,6 +57,7 @@ model User {
 
   articles           Article[]
   activityLogs       ActivityLog[]
+  searchHistory      SearchHistory[]
   sessions           Session[]
   accounts           Account[]
   twoFactors         TwoFactor[]
@@ -197,12 +198,64 @@ model Article {
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-  tags ArticleTag[]
+  tags        ArticleTag[]
+  viewEvents  ViewEvent[]
+  collections CollectionItem[]
 
   @@index([status, publishedAt])
   @@index([authorId])
   @@index([categoryId])
   @@map("article")
+}
+
+// One row per page view — powers the time-windowed trending engine.
+model ViewEvent {
+  id        String   @id @default(cuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  userId    String? // no FK: kept anonymous-ish for analytics
+  createdAt DateTime @default(now())
+
+  @@index([articleId, createdAt])
+  @@index([createdAt])
+  @@map("view_event")
+}
+
+model SearchHistory {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query     String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([query])
+  @@map("search_history")
+}
+
+// Curated cross-category content hubs (e.g. "AI Special Report")
+model Collection {
+  id          String           @id @default(cuid())
+  name        String
+  slug        String           @unique
+  description String?
+  coverImage  String?
+  featured    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  items       CollectionItem[]
+
+  @@map("collection")
+}
+
+model CollectionItem {
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  articleId    String
+  article      Article    @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  sortOrder    Int        @default(0)
+
+  @@id([collectionId, articleId])
+  @@map("collection_item")
 }
 
 model ArticleTag {
@@ -265,7 +318,8 @@ model Bookmark {
   id          String       @id @default(cuid())
   userId      String
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  articleSlug String // becomes an Article FK in Phase 4
+  articleSlug String
+  archived    Boolean      @default(false)
   createdAt   DateTime     @default(now())
   listId      String?
   list        ReadingList? @relation(fields: [listId], references: [id], onDelete: SetNull)

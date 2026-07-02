@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bookmark, LogOut, PenSquare, Settings, Shield, User as UserIcon } from "lucide-react";
+import { Bookmark, LayoutDashboard, LogOut, PenSquare, Settings, Shield, User as UserIcon } from "lucide-react";
 import { authClient, signOut, useSession } from "@/lib/auth-client";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,6 +47,7 @@ export function UserMenu() {
 
   const items = [
     ...(isWriter ? [{ label: "Write an article", href: "/write", Icon: PenSquare }] : []),
+    { label: "My dashboard", href: "/dashboard", Icon: LayoutDashboard },
     { label: "My profile", href: `/u/${user.username ?? user.id}`, Icon: UserIcon },
     { label: "Saved articles", href: "/saved", Icon: Bookmark },
     { label: "Settings", href: "/settings", Icon: Settings },

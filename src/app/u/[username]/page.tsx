@@ -5,8 +5,10 @@ import { CalendarDays, Globe, Lock, MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
 import { TOPICS } from "@/lib/constants";
+import { articleInclude, liveWhere, toCardModel } from "@/lib/articles";
 import { Container } from "@/components/ui/container";
 import { Badge } from "@/components/ui/badge";
+import { ArticleCard } from "@/components/articles/article-card";
 import { FollowButton } from "@/components/follow-button";
 import {
   FacebookIcon,
@@ -67,7 +69,7 @@ export default async function PublicProfilePage({ params }: Props) {
     );
   }
 
-  const [interests, followerCount, followingSelf] = await Promise.all([
+  const [interests, followerCount, followingSelf, publishedArticles] = await Promise.all([
     user.showReadingActivity
       ? prisma.userInterest.findMany({ where: { userId: user.id } })
       : Promise.resolve([]),
@@ -87,7 +89,15 @@ export default async function PublicProfilePage({ params }: Props) {
           })
           .then(Boolean)
       : Promise.resolve(false),
+    prisma.article.findMany({
+      where: { authorId: user.id, ...liveWhere() },
+      include: articleInclude,
+      orderBy: { publishedAt: "desc" },
+      take: 9,
+    }),
   ]);
+
+  const totalViews = publishedArticles.reduce((sum, a) => sum + a.views, 0);
 
   let socialLinks: Record<string, string> = {};
   try {
@@ -131,6 +141,13 @@ export default async function PublicProfilePage({ params }: Props) {
               <span className="font-semibold text-foreground">{followerCount}</span>{" "}
               follower{followerCount === 1 ? "" : "s"}
             </span>
+            {publishedArticles.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">{publishedArticles.length}</span>{" "}
+                article{publishedArticles.length === 1 ? "" : "s"} ·{" "}
+                <span className="font-semibold text-foreground">{totalViews.toLocaleString()}</span> views
+              </span>
+            )}
             {isSelf ? (
               <Link
                 href="/settings"
@@ -216,9 +233,20 @@ export default async function PublicProfilePage({ params }: Props) {
           </div>
         )}
 
-        <div className="mt-12 rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-          Published articles, comments and reading achievements appear here in later phases.
-        </div>
+        {publishedArticles.length > 0 ? (
+          <div className="mt-10">
+            <h2 className="text-xl font-bold">Published articles</h2>
+            <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {publishedArticles.map((a) => (
+                <ArticleCard key={a.id} article={toCardModel(a)} />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-12 rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+            No published articles yet. Comments and reading achievements arrive in later phases.
+          </div>
+        )}
       </Container>
     </>
   );

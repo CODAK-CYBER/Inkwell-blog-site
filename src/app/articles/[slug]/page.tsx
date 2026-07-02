@@ -3,14 +3,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Clock, Eye } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { articleInclude, liveWhere } from "@/lib/articles";
-import { renderMarkdown } from "@/lib/markdown";
+import { articleInclude, liveWhere, toCardModel } from "@/lib/articles";
+import { extractHeadings, renderMarkdown } from "@/lib/markdown";
 import { formatDate } from "@/lib/utils";
 import { getServerSession } from "@/lib/session";
 import { hasPermission } from "@/lib/rbac";
 import { Container } from "@/components/ui/container";
 import { Badge } from "@/components/ui/badge";
 import { EngagementBar } from "@/components/articles/engagement-bar";
+import { ReadingExperience } from "@/components/articles/reading-experience";
+import { TableOfContents } from "@/components/articles/table-of-contents";
+import { ArticleCard } from "@/components/articles/article-card";
 import { FollowButton } from "@/components/follow-button";
 import { buttonVariants } from "@/components/ui/button";
 
@@ -57,16 +60,18 @@ export default async function ArticlePage({ params }: Props) {
   const isLive = article.status === "published" ||
     (article.status === "scheduled" && article.scheduledFor && article.scheduledFor <= new Date());
 
-  // View counter (fire-and-forget; real analytics arrive in Phase 11)
+  // View counter + timestamped event for the trending engine (fire-and-forget)
   if (isLive) {
-    prisma.article
-      .update({ where: { id: article.id }, data: { views: { increment: 1 } } })
-      .catch(() => {});
+    const articleId = article.id;
+    Promise.all([
+      prisma.article.update({ where: { id: articleId }, data: { views: { increment: 1 } } }),
+      prisma.viewEvent.create({ data: { articleId, userId: session?.user.id } }),
+    ]).catch(() => {});
   }
 
   const userId = session?.user.id;
   const authorKey = article.author.username ?? article.authorId;
-  const [likeCount, liked, bookmarked, followingAuthor] = await Promise.all([
+  const [likeCount, liked, bookmarked, followingAuthor, history, related] = await Promise.all([
     prisma.like.count({ where: { articleSlug: slug } }),
     userId
       ? prisma.like.findUnique({ where: { userId_articleSlug: { userId, articleSlug: slug } } }).then(Boolean)
@@ -83,7 +88,30 @@ export default async function ArticlePage({ params }: Props) {
           })
           .then(Boolean)
       : false,
+    userId
+      ? prisma.readingHistory.findUnique({
+          where: { userId_articleSlug: { userId, articleSlug: slug } },
+        })
+      : null,
+    prisma.article.findMany({
+      where: {
+        ...liveWhere(),
+        id: { not: article.id },
+        OR: [
+          ...(article.categoryId ? [{ categoryId: article.categoryId }] : []),
+          { tags: { some: { tagId: { in: article.tags.map((t) => t.tag.id) } } } },
+        ],
+      },
+      include: articleInclude,
+      orderBy: { publishedAt: "desc" },
+      take: 3,
+    }),
   ]);
+
+  const headings = extractHeadings(article.content);
+  const updated =
+    article.publishedAt &&
+    article.updatedAt.getTime() - article.publishedAt.getTime() > 86_400_000;
 
   const canEdit =
     session &&
@@ -95,7 +123,12 @@ export default async function ArticlePage({ params }: Props) {
 
   return (
     <article>
-      <Container className="max-w-3xl py-14">
+      <ReadingExperience
+        slug={slug}
+        signedIn={Boolean(session)}
+        initialProgress={history?.progress ?? 0}
+      />
+      <Container id="article-shell" className="max-w-3xl py-14">
         {!isLive && (
           <p className="mb-6 rounded-md border border-accent/40 bg-accent-soft px-3 py-2 text-sm">
             Staff preview — this article is <strong>{article.status}</strong> and not visible to readers.
@@ -152,6 +185,7 @@ export default async function ArticlePage({ params }: Props) {
               className="block text-xs text-muted-foreground"
             >
               {formatDate(article.publishedAt ?? article.createdAt)}
+              {updated && ` · Updated ${formatDate(article.updatedAt)}`}
             </time>
           </div>
           <FollowButton
@@ -184,18 +218,33 @@ export default async function ArticlePage({ params }: Props) {
           <div className="mt-8 aspect-[16/9] rounded-xl bg-gradient-to-br from-secondary to-muted" />
         )}
 
-        <div className="article-content mt-8" dangerouslySetInnerHTML={{ __html: html }} />
+        <TableOfContents headings={headings} />
+
+        <div id="article-body" className="article-content mt-8" dangerouslySetInnerHTML={{ __html: html }} />
 
         {article.tags.length > 0 && (
           <div className="mt-10 flex flex-wrap gap-2">
             {article.tags.map(({ tag }) => (
-              <Badge key={tag.id} variant="outline">
-                #{tag.name}
-              </Badge>
+              <Link key={tag.id} href={`/search?tag=${tag.slug}`}>
+                <Badge variant="outline">#{tag.name}</Badge>
+              </Link>
             ))}
           </div>
         )}
       </Container>
+
+      {related.length > 0 && (
+        <div className="border-t bg-card py-12">
+          <Container>
+            <h2 className="text-2xl font-bold">Related articles</h2>
+            <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {related.map((r) => (
+                <ArticleCard key={r.id} article={toCardModel(r)} />
+              ))}
+            </div>
+          </Container>
+        </div>
+      )}
     </article>
   );
 }
