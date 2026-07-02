@@ -1,8 +1,9 @@
 import type { MetadataRoute } from "next";
 import { siteConfig } from "@/lib/site";
-import { mockArticles, mockCategories } from "@/lib/mock-data";
+import { prisma } from "@/lib/prisma";
+import { liveWhere } from "@/lib/articles";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
     "",
     "/articles",
@@ -19,19 +20,27 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: path === "" ? 1 : 0.7,
   }));
 
-  const articlePages: MetadataRoute.Sitemap = mockArticles.map((a) => ({
-    url: `${siteConfig.url}/articles/${a.slug}`,
-    lastModified: new Date(a.publishedAt),
-    changeFrequency: "monthly",
-    priority: 0.8,
-  }));
+  const [articles, categories] = await Promise.all([
+    prisma.article.findMany({
+      where: liveWhere(),
+      select: { slug: true, updatedAt: true },
+    }),
+    prisma.category.findMany({ select: { slug: true } }),
+  ]);
 
-  const categoryPages: MetadataRoute.Sitemap = mockCategories.map((c) => ({
-    url: `${siteConfig.url}/categories/${c.slug}`,
-    lastModified: new Date(),
-    changeFrequency: "daily",
-    priority: 0.6,
-  }));
-
-  return [...staticPages, ...articlePages, ...categoryPages];
+  return [
+    ...staticPages,
+    ...articles.map((a) => ({
+      url: `${siteConfig.url}/articles/${a.slug}`,
+      lastModified: a.updatedAt,
+      changeFrequency: "monthly" as const,
+      priority: 0.8,
+    })),
+    ...categories.map((c) => ({
+      url: `${siteConfig.url}/categories/${c.slug}`,
+      lastModified: new Date(),
+      changeFrequency: "daily" as const,
+      priority: 0.6,
+    })),
+  ];
 }

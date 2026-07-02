@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { mockArticles } from "@/lib/mock-data";
+import { getLiveArticles, toCardModel } from "@/lib/articles";
 import { Container } from "@/components/ui/container";
 import { ArticleCard } from "@/components/articles/article-card";
 
@@ -8,18 +8,26 @@ export const metadata: Metadata = {
   description: "Browse the latest articles across every category.",
 };
 
-export default function ArticlesPage() {
+export default async function ArticlesPage() {
+  const articles = await getLiveArticles();
+
   return (
     <Container className="py-14">
       <h1 className="text-3xl font-bold sm:text-4xl">All articles</h1>
       <p className="mt-2 text-muted-foreground">
         Everything we&apos;ve published, newest first.
       </p>
-      <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {mockArticles.map((article) => (
-          <ArticleCard key={article.id} article={article} />
-        ))}
-      </div>
+      {articles.length > 0 ? (
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {articles.map((article) => (
+            <ArticleCard key={article.id} article={toCardModel(article)} />
+          ))}
+        </div>
+      ) : (
+        <p className="mt-10 rounded-xl border border-dashed p-10 text-center text-muted-foreground">
+          Nothing published yet — check back soon.
+        </p>
+      )}
     </Container>
   );
 }

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { siteConfig } from "@/lib/site";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function MobileNav() {
@@ -91,13 +91,13 @@ export function MobileNav() {
                 })}
               </nav>
 
-              <div className="mt-auto space-y-3 border-t pt-6">
-                <Button className="w-full" variant="accent">
+              <div className="mt-auto border-t pt-6">
+                <Link
+                  href="/login"
+                  className={cn(buttonVariants({ variant: "accent" }), "w-full")}
+                >
                   Sign in
-                </Button>
-                <p className="text-center text-xs text-muted-foreground">
-                  Accounts arrive in Phase 2
-                </p>
+                </Link>
               </div>
             </motion.aside>
           </>

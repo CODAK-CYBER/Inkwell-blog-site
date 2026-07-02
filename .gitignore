@@ -42,3 +42,8 @@ next-env.d.ts
 
 # local Claude Code settings
 .claude/settings.local.json
+
+# local dev database & dev email outbox
+prisma/dev.db*
+dev-emails/
+!.env.example

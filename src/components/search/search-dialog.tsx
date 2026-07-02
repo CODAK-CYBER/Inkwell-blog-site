@@ -4,7 +4,6 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Search, TrendingUp, X } from "lucide-react";
-import { mockCategories } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -12,7 +11,11 @@ import { Button } from "@/components/ui/button";
  * Phase 1 ships the UI shell; live results arrive with the search
  * engine in Phase 6.
  */
-export function SearchDialog() {
+export function SearchDialog({
+  categories = [],
+}: {
+  categories?: Array<{ name: string; slug: string }>;
+}) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -123,9 +126,9 @@ export function SearchDialog() {
                       <TrendingUp className="size-3.5" /> Popular topics
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {mockCategories.map((c) => (
+                      {categories.map((c) => (
                         <button
-                          key={c.id}
+                          key={c.slug}
                           onClick={() => {
                             setOpen(false);
                             router.push(`/categories/${c.slug}`);

@@ -1,0 +1,412 @@
+// Inkwell database schema.
+//
+// Dev runs on SQLite; production targets PostgreSQL (Neon/Supabase).
+// Kept portable: no enums (SQLite doesn't support them) — allowed values
+// live in src/lib/constants.ts — and JSON blobs are stored as strings.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------
+// Auth core (shape required by better-auth + its plugins)
+// ------------------------------------------------------------------
+
+model User {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // username plugin
+  username        String? @unique
+  displayUsername String?
+
+  // admin plugin
+  role       String?   @default("user")
+  banned     Boolean?  @default(false)
+  banReason  String?
+  banExpires DateTime?
+
+  // twoFactor plugin
+  twoFactorEnabled Boolean? @default(false)
+
+  // Profile
+  bio         String?
+  website     String?
+  location    String?
+  coverImage  String?
+  socialLinks String? // JSON: { twitter, github, linkedin, ... }
+  language    String  @default("en")
+  timezone    String  @default("UTC")
+
+  // Preferences
+  profileVisibility     String  @default("public") // public | private
+  showReadingActivity   Boolean @default(true)
+  preferredContentTypes String? // JSON: ["articles","videos","podcasts"]
+  emailFrequency        String  @default("weekly") // daily | weekly | monthly | none
+  onboardingComplete    Boolean @default(false)
+
+  articles           Article[]
+  activityLogs       ActivityLog[]
+  sessions           Session[]
+  accounts           Account[]
+  twoFactors         TwoFactor[]
+  interests          UserInterest[]
+  follows            Follow[]
+  bookmarks          Bookmark[]
+  likes              Like[]
+  readingHistory     ReadingHistory[]
+  readingLists       ReadingList[]
+  loginEvents        LoginEvent[]
+  notificationPrefs  NotificationPreferences?
+  badges             UserBadge[]
+  subscriptions      Subscription[]
+  loyaltyTransactions LoyaltyTransaction[]
+  referralsMade      Referral[] @relation("referrer")
+  referralReceived   Referral?  @relation("referred")
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // admin plugin
+  impersonatedBy String?
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model TwoFactor {
+  id          String @id
+  secret      String
+  backupCodes String
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("twoFactor")
+}
+
+// ------------------------------------------------------------------
+// Content (articles, categories, tags)
+// ------------------------------------------------------------------
+
+model Category {
+  id             String     @id @default(cuid())
+  name           String
+  slug           String     @unique
+  description    String?
+  icon           String? // emoji or icon name
+  image          String?
+  sortOrder      Int        @default(0)
+  parentId       String?
+  parent         Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children       Category[] @relation("CategoryTree")
+  seoTitle       String?
+  seoDescription String?
+  createdAt      DateTime   @default(now())
+  articles       Article[]
+
+  @@map("category")
+}
+
+model Tag {
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique
+  createdAt DateTime     @default(now())
+  articles  ArticleTag[]
+
+  @@map("tag")
+}
+
+// Article.status: draft | pending | scheduled | published | archived | trashed
+model Article {
+  id             String    @id @default(cuid())
+  title          String
+  slug           String    @unique
+  excerpt        String
+  content        String // markdown
+  coverImage     String?
+  status         String    @default("draft")
+  featured       Boolean   @default(false)
+  pinned         Boolean   @default(false)
+  views          Int       @default(0)
+  readingTime    Int       @default(1)
+  seoTitle       String?
+  seoDescription String?
+  canonicalUrl   String?
+  publishedAt    DateTime?
+  scheduledFor   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  authorId   String
+  author     User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  tags ArticleTag[]
+
+  @@index([status, publishedAt])
+  @@index([authorId])
+  @@index([categoryId])
+  @@map("article")
+}
+
+model ArticleTag {
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tagId     String
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, tagId])
+  @@map("article_tag")
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String // e.g. article.published, user.banned, category.created
+  targetType String?
+  targetId   String?
+  detail     String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("activity_log")
+}
+
+// ------------------------------------------------------------------
+// Personalization (powers Phase 3)
+// ------------------------------------------------------------------
+
+model UserInterest {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic     String // category slug, e.g. "technology"
+  createdAt DateTime @default(now())
+
+  @@unique([userId, topic])
+  @@map("user_interest")
+}
+
+model Follow {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetType String // author | category | tag
+  targetKey  String // slug or id of the followed entity
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, targetType, targetKey])
+  @@index([targetType, targetKey])
+  @@map("follow")
+}
+
+// ------------------------------------------------------------------
+// Saved content & engagement
+// ------------------------------------------------------------------
+
+model Bookmark {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  articleSlug String // becomes an Article FK in Phase 4
+  createdAt   DateTime     @default(now())
+  listId      String?
+  list        ReadingList? @relation(fields: [listId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, articleSlug])
+  @@map("bookmark")
+}
+
+model Like {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  articleSlug String
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, articleSlug])
+  @@index([articleSlug])
+  @@map("like")
+}
+
+model ReadingHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  articleSlug String
+  readAt      DateTime @default(now())
+  progress    Float    @default(0) // 0..1 scroll progress
+
+  @@unique([userId, articleSlug])
+  @@index([userId, readAt])
+  @@map("reading_history")
+}
+
+model ReadingList {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  isPublic    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  bookmarks   Bookmark[]
+
+  @@map("reading_list")
+}
+
+// ------------------------------------------------------------------
+// Security & notifications
+// ------------------------------------------------------------------
+
+model LoginEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("login_event")
+}
+
+model NotificationPreferences {
+  id             String  @id @default(cuid())
+  userId         String  @unique
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailEnabled   Boolean @default(true)
+  inAppEnabled   Boolean @default(true)
+  pushEnabled    Boolean @default(false)
+  weeklyDigest   Boolean @default(true)
+  breakingNews   Boolean @default(false)
+  newFollower    Boolean @default(true)
+  newLoginAlert  Boolean @default(true)
+  categoryTopics String? // JSON: category slugs to notify about
+
+  @@map("notification_preferences")
+}
+
+// ------------------------------------------------------------------
+// Future-proofing (Phases 3, 7, 10): dormant until those phases land
+// ------------------------------------------------------------------
+
+model Badge {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  name        String
+  description String
+  icon        String?
+  users       UserBadge[]
+
+  @@map("badge")
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeId   String
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  awardedAt DateTime @default(now())
+
+  @@unique([userId, badgeId])
+  @@map("user_badge")
+}
+
+model Subscription {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan              String // free | premium_monthly | premium_yearly
+  status            String // active | canceled | past_due | trialing
+  provider          String? // stripe | paystack | ...
+  providerCustomerId String?
+  currentPeriodEnd  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("subscription")
+}
+
+model LoyaltyTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points    Int
+  reason    String // read_streak | referral | comment | ...
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("loyalty_transaction")
+}
+
+model Referral {
+  id             String   @id @default(cuid())
+  referrerId     String
+  referrer       User     @relation("referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUserId String?  @unique
+  referredUser   User?    @relation("referred", fields: [referredUserId], references: [id], onDelete: SetNull)
+  code           String   @unique
+  createdAt      DateTime @default(now())
+
+  @@map("referral")
+}

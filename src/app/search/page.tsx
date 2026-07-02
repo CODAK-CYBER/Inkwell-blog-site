@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Search } from "lucide-react";
-import { mockArticles } from "@/lib/mock-data";
+import { prisma } from "@/lib/prisma";
+import { articleInclude, liveWhere, toCardModel } from "@/lib/articles";
 import { Container } from "@/components/ui/container";
 import { ArticleCard } from "@/components/articles/article-card";
 
@@ -18,14 +19,23 @@ export default async function SearchPage({ searchParams }: Props) {
   const { q } = await searchParams;
   const query = q?.trim() ?? "";
 
-  // Naive filter over mock data; replaced by the real search engine in Phase 6.
+  // Database contains-search; upgraded to a real search engine in Phase 6.
   const results = query
-    ? mockArticles.filter((a) =>
-        [a.title, a.excerpt, a.category.name, a.author.name, ...a.tags]
-          .join(" ")
-          .toLowerCase()
-          .includes(query.toLowerCase())
-      )
+    ? await prisma.article.findMany({
+        where: {
+          ...liveWhere(),
+          OR: [
+            { title: { contains: query } },
+            { excerpt: { contains: query } },
+            { content: { contains: query } },
+            { tags: { some: { tag: { name: { contains: query } } } } },
+            { author: { name: { contains: query } } },
+          ],
+        },
+        include: articleInclude,
+        orderBy: { publishedAt: "desc" },
+        take: 30,
+      })
     : [];
 
   return (
@@ -40,7 +50,7 @@ export default async function SearchPage({ searchParams }: Props) {
           {results.length > 0 ? (
             <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {results.map((article) => (
-                <ArticleCard key={article.id} article={article} />
+                <ArticleCard key={article.id} article={toCardModel(article)} />
               ))}
             </div>
           ) : (

@@ -1,20 +1,63 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { siteConfig } from "@/lib/site";
-import { mockArticles, mockCategories } from "@/lib/mock-data";
+import { getServerSession } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
+import { getLiveArticles, liveWhere, toCardModel } from "@/lib/articles";
+import { TOPICS } from "@/lib/constants";
 import { Container } from "@/components/ui/container";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants, Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { ArticleCard } from "@/components/articles/article-card";
 
-export default function HomePage() {
-  const featured = mockArticles.filter((a) => a.featured);
-  const latest = mockArticles.filter((a) => !a.featured);
+export default async function HomePage() {
+  // Signed-in users finish onboarding before seeing the homepage.
+  const session = await getServerSession();
+  if (session && !session.user.onboardingComplete) redirect("/onboarding");
+
+  const [featured, latestAll, categories, interests] = await Promise.all([
+    getLiveArticles({ featured: true, take: 2 }),
+    getLiveArticles({ take: 8 }),
+    prisma.category.findMany({
+      where: { parentId: null },
+      orderBy: { sortOrder: "asc" },
+      take: 6,
+      include: { _count: { select: { articles: { where: liveWhere() } } } },
+    }),
+    session
+      ? prisma.userInterest.findMany({ where: { userId: session.user.id } })
+      : Promise.resolve([]),
+  ]);
+
+  const featuredIds = new Set(featured.map((a) => a.id));
+  const latest = latestAll.filter((a) => !featuredIds.has(a.id)).slice(0, 6);
+
+  const interestTopics = interests
+    .map((i) => TOPICS.find((t) => t.slug === i.topic))
+    .filter((t): t is (typeof TOPICS)[number] => Boolean(t));
 
   return (
     <>
+      {/* Your topics (personalized feed lands in Phase 3) */}
+      {session && interestTopics.length > 0 && (
+        <section className="border-b bg-accent-soft/40">
+          <Container className="flex flex-wrap items-center gap-2 py-3">
+            <span className="text-sm font-medium text-muted-foreground">Your topics:</span>
+            {interestTopics.map((topic) => (
+              <Link
+                key={topic.slug}
+                href={`/categories/${topic.slug}`}
+                className="rounded-full border bg-background px-3 py-1 text-sm transition-colors hover:border-accent hover:text-accent"
+              >
+                {topic.emoji} {topic.label}
+              </Link>
+            ))}
+          </Container>
+        </section>
+      )}
+
       {/* Hero */}
       <section className="border-b bg-card">
         <Container className="py-16 text-center sm:py-24">
@@ -42,29 +85,31 @@ export default function HomePage() {
       </section>
 
       {/* Featured */}
-      <section className="py-14">
-        <Container>
-          <div className="mb-8 flex items-end justify-between">
-            <div>
-              <h2 className="text-2xl font-bold sm:text-3xl">Featured stories</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Hand-picked reads from our editors
-              </p>
+      {featured.length > 0 && (
+        <section className="py-14">
+          <Container>
+            <div className="mb-8 flex items-end justify-between">
+              <div>
+                <h2 className="text-2xl font-bold sm:text-3xl">Featured stories</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Hand-picked reads from our editors
+                </p>
+              </div>
+              <Link
+                href="/articles"
+                className="flex items-center gap-1 text-sm font-medium text-accent hover:underline"
+              >
+                View all <ArrowRight className="size-4" />
+              </Link>
             </div>
-            <Link
-              href="/articles"
-              className="flex items-center gap-1 text-sm font-medium text-accent hover:underline"
-            >
-              View all <ArrowRight className="size-4" />
-            </Link>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-2">
-            {featured.map((article) => (
-              <ArticleCard key={article.id} article={article} />
-            ))}
-          </div>
-        </Container>
-      </section>
+            <div className="grid gap-6 sm:grid-cols-2">
+              {featured.map((article) => (
+                <ArticleCard key={article.id} article={toCardModel(article)} />
+              ))}
+            </div>
+          </Container>
+        </section>
+      )}
 
       {/* Categories */}
       <section className="border-y bg-card py-14">
@@ -74,17 +119,21 @@ export default function HomePage() {
             Follow the topics that matter to you
           </p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {mockCategories.map((category) => (
+            {categories.map((category) => (
               <Link
                 key={category.id}
                 href={`/categories/${category.slug}`}
                 className="group rounded-xl border bg-background p-5 transition-all hover:border-accent hover:shadow-sm"
               >
-                <h3 className="font-serif text-lg font-semibold group-hover:text-accent">
+                <h3 className="flex items-center gap-2 font-serif text-lg font-semibold group-hover:text-accent">
+                  {category.icon && <span>{category.icon}</span>}
                   {category.name}
                 </h3>
                 <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                   {category.description}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {category._count.articles} article{category._count.articles === 1 ? "" : "s"}
                 </p>
               </Link>
             ))}
@@ -98,9 +147,7 @@ export default function HomePage() {
           <div className="mb-8 flex items-end justify-between">
             <div>
               <h2 className="text-2xl font-bold sm:text-3xl">Latest articles</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Fresh off the press
-              </p>
+              <p className="mt-1 text-sm text-muted-foreground">Fresh off the press</p>
             </div>
             <Link
               href="/articles"
@@ -111,7 +158,7 @@ export default function HomePage() {
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {latest.map((article) => (
-              <ArticleCard key={article.id} article={article} />
+              <ArticleCard key={article.id} article={toCardModel(article)} />
             ))}
           </div>
         </Container>
