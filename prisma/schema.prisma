@@ -172,7 +172,8 @@ model Tag {
   @@map("tag")
 }
 
-// Article.status: draft | pending | scheduled | published | archived | trashed
+// Article.status pipeline: draft → pending → needs_revision ⇄ fact_check →
+// seo_review → approved → scheduled → published → archived | trashed
 model Article {
   id             String    @id @default(cuid())
   title          String
@@ -183,13 +184,20 @@ model Article {
   status         String    @default("draft")
   featured       Boolean   @default(false)
   pinned         Boolean   @default(false)
+  isBreaking     Boolean   @default(false)
+  isPremium      Boolean   @default(false)
+  isSponsored    Boolean   @default(false)
+  engagementEnabled Boolean @default(true)
+  allowComments  Boolean   @default(true)
   views          Int       @default(0)
   readingTime    Int       @default(1)
   seoTitle       String?
   seoDescription String?
   canonicalUrl   String?
+  focusKeyword   String?
   publishedAt    DateTime?
   scheduledFor   DateTime?
+  expiresAt      DateTime? // auto-unpublish after this moment
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -198,14 +206,99 @@ model Article {
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-  tags        ArticleTag[]
-  viewEvents  ViewEvent[]
-  collections CollectionItem[]
+  tags          ArticleTag[]
+  viewEvents    ViewEvent[]
+  collections   CollectionItem[]
+  versions      ArticleVersion[]
+  statusHistory ArticleStatusHistory[]
+  mediaUsage    MediaUsage[]
 
   @@index([status, publishedAt])
   @@index([authorId])
   @@index([categoryId])
   @@map("article")
+}
+
+// Snapshot of an article's content each time it is saved (capped per article).
+model ArticleVersion {
+  id        String   @id @default(cuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  title     String
+  excerpt   String
+  content   String
+  editorId  String?
+  createdAt DateTime @default(now())
+
+  @@index([articleId, createdAt])
+  @@map("article_version")
+}
+
+model ArticleStatusHistory {
+  id         String   @id @default(cuid())
+  articleId  String
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  fromStatus String
+  toStatus   String
+  userId     String?
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([articleId, createdAt])
+  @@map("article_status_history")
+}
+
+// ------------------------------------------------------------------
+// Digital Asset Management
+// ------------------------------------------------------------------
+
+model MediaFolder {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  media     Media[]
+
+  @@map("media_folder")
+}
+
+// Media.kind: image | video | audio | document
+model Media {
+  id         String       @id @default(cuid())
+  filename   String // original filename
+  url        String // public URL (local path or Cloudinary)
+  kind       String
+  mimeType   String
+  size       Int // bytes
+  width      Int?
+  height     Int?
+  hash       String // sha256 of contents — duplicate detection
+  alt        String?
+  caption    String?
+  credit     String? // copyright / attribution
+  tags       String? // comma-separated
+  favorite   Boolean      @default(false)
+  deletedAt  DateTime? // soft delete ("trash")
+  folderId   String?
+  folder     MediaFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  uploaderId String?
+  createdAt  DateTime     @default(now())
+  usage      MediaUsage[]
+
+  @@index([kind, deletedAt])
+  @@index([hash])
+  @@map("media")
+}
+
+// Which articles reference which assets — synced on every article save.
+model MediaUsage {
+  mediaId   String
+  media     Media   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  field     String  @default("content") // content | cover
+
+  @@id([mediaId, articleId, field])
+  @@map("media_usage")
 }
 
 // One row per page view — powers the time-windowed trending engine.

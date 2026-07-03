@@ -10,7 +10,19 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-const STATUSES = ["all", "published", "pending", "draft", "scheduled", "archived", "trashed"] as const;
+const STATUSES = [
+  "all",
+  "published",
+  "pending",
+  "needs_revision",
+  "fact_check",
+  "seo_review",
+  "approved",
+  "draft",
+  "scheduled",
+  "archived",
+  "trashed",
+] as const;
 
 interface Props {
   searchParams: Promise<{ status?: string; q?: string }>;
@@ -78,7 +90,8 @@ export default async function AdminArticlesPage({ searchParams }: Props) {
                 : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
-            {s} <span className="text-xs text-muted-foreground">({countFor(s)})</span>
+            {s.replace(/_/g, " ")}{" "}
+            <span className="text-xs text-muted-foreground">({countFor(s)})</span>
           </Link>
         ))}
       </div>

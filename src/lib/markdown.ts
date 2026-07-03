@@ -15,9 +15,22 @@ renderer.heading = function ({ tokens, depth }: Tokens.Heading) {
 /** Markdown → sanitized HTML. Safe for user-authored content. */
 export function renderMarkdown(md: string): string {
   const raw = marked.parse(md, { async: false, renderer });
-  return DOMPurify.sanitize(raw, {
+  const clean = DOMPurify.sanitize(raw, {
     ADD_ATTR: ["target", "rel", "id"],
   });
+  return embedYouTube(clean);
+}
+
+/**
+ * A paragraph containing only a YouTube link becomes an embedded player.
+ * Runs AFTER sanitization; the iframe src is built from a validated ID only.
+ */
+function embedYouTube(html: string): string {
+  return html.replace(
+    /<p><a[^>]*href="https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{6,20})[^"]*"[^>]*>[^<]*<\/a><\/p>/g,
+    (_match, videoId: string) =>
+      `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${videoId}" title="YouTube video" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`
+  );
 }
 
 export interface Heading {

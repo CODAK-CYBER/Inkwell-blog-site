@@ -8,10 +8,17 @@ import type { Article as ArticleCardModel } from "@/types";
  * dev correct without one.)
  */
 export function liveWhere(): Prisma.ArticleWhereInput {
+  const now = new Date();
   return {
-    OR: [
-      { status: "published" },
-      { status: "scheduled", scheduledFor: { lte: new Date() } },
+    AND: [
+      {
+        OR: [
+          { status: "published" },
+          { status: "scheduled", scheduledFor: { lte: now } },
+        ],
+      },
+      // Scheduled expiration: articles past expiresAt drop off the site.
+      { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
     ],
   };
 }

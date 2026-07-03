@@ -5,14 +5,17 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
 import { hasPermission } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
+import { syncMediaUsage } from "@/lib/media";
 import { readingTime, slugify } from "@/lib/utils";
 
 // ----------------------------------------------------------------
-// Content approval workflow:
-//   author:  draft → pending (submit for review)
-//   editor+: pending → published / back to draft (request changes)
-//   editor+: publish now, schedule, archive, feature, pin
+// Editorial pipeline (each transition permission-controlled):
+//   draft → pending → [needs_revision ⇄] fact_check → seo_review →
+//   approved → published/scheduled → archived | trashed
+//   author:  draft/needs_revision → pending (submit for review)
+//   editor+: move through review stages, publish, schedule, feature, pin
 //   admin/superadmin: everything, including trash/restore/hard delete
+// Every transition is recorded in ArticleStatusHistory.
 // ----------------------------------------------------------------
 
 export interface ArticleInput {
@@ -26,6 +29,13 @@ export interface ArticleInput {
   seoTitle?: string;
   seoDescription?: string;
   canonicalUrl?: string;
+  focusKeyword?: string;
+  isBreaking?: boolean;
+  isPremium?: boolean;
+  isSponsored?: boolean;
+  engagementEnabled?: boolean;
+  allowComments?: boolean;
+  expiresAt?: string | null;
 }
 
 async function requireSession() {
@@ -75,6 +85,7 @@ export async function saveArticle(input: ArticleInput, id?: string) {
     return { error: "You don't have permission to write articles. Become an author in Settings." };
   }
 
+  const expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
   const data = {
     title: input.title.trim() || "Untitled",
     excerpt: input.excerpt.trim(),
@@ -84,6 +95,13 @@ export async function saveArticle(input: ArticleInput, id?: string) {
     seoTitle: input.seoTitle?.trim() || null,
     seoDescription: input.seoDescription?.trim() || null,
     canonicalUrl: input.canonicalUrl?.trim() || null,
+    focusKeyword: input.focusKeyword?.trim() || null,
+    isBreaking: input.isBreaking ?? false,
+    isPremium: input.isPremium ?? false,
+    isSponsored: input.isSponsored ?? false,
+    engagementEnabled: input.engagementEnabled ?? true,
+    allowComments: input.allowComments ?? true,
+    expiresAt: expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : null,
     readingTime: readingTime(input.content),
   };
 
@@ -95,6 +113,36 @@ export async function saveArticle(input: ArticleInput, id?: string) {
     if (!(ownsIt ? hasPermission(role, { article: ["updateOwn"] }) : hasPermission(role, { article: ["update"] }))) {
       return { error: "You can't edit this article." };
     }
+
+    // Version snapshot of the previous state when the content changed.
+    if (
+      existing.content !== data.content ||
+      existing.title !== data.title ||
+      existing.excerpt !== data.excerpt
+    ) {
+      await prisma.articleVersion.create({
+        data: {
+          articleId: id,
+          title: existing.title,
+          excerpt: existing.excerpt,
+          content: existing.content,
+          editorId: session.user.id,
+        },
+      });
+      // Cap at 20 versions per article.
+      const excess = await prisma.articleVersion.findMany({
+        where: { articleId: id },
+        orderBy: { createdAt: "desc" },
+        skip: 20,
+        select: { id: true },
+      });
+      if (excess.length) {
+        await prisma.articleVersion.deleteMany({
+          where: { id: { in: excess.map((v) => v.id) } },
+        });
+      }
+    }
+
     const slug = input.slug ? await uniqueSlug(input.slug, id) : existing.slug;
     article = await prisma.article.update({ where: { id }, data: { ...data, slug } });
   } else {
@@ -112,8 +160,42 @@ export async function saveArticle(input: ArticleInput, id?: string) {
   }
 
   await syncTags(article.id, input.tags);
+  await syncMediaUsage(article.id, data.content, data.coverImage);
   revalidateContent();
   return { id: article.id, slug: article.slug };
+}
+
+/** Version history for the editor panel. */
+export async function listVersions(articleId: string) {
+  const session = await requireSession();
+  const article = await prisma.article.findUnique({ where: { id: articleId } });
+  if (!article) return [];
+  const ownsIt = article.authorId === session.user.id;
+  if (!(ownsIt || hasPermission(session.user.role, { article: ["update"] }))) return [];
+
+  return prisma.articleVersion.findMany({
+    where: { articleId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, title: true, createdAt: true },
+  });
+}
+
+/** Returns the snapshot so the editor can load it (a save re-snapshots current state). */
+export async function getVersion(versionId: string) {
+  const session = await requireSession();
+  const version = await prisma.articleVersion.findUnique({
+    where: { id: versionId },
+    include: { article: { select: { authorId: true } } },
+  });
+  if (!version) return null;
+  const ownsIt = version.article.authorId === session.user.id;
+  if (!(ownsIt || hasPermission(session.user.role, { article: ["update"] }))) return null;
+  return {
+    title: version.title,
+    excerpt: version.excerpt,
+    content: version.content,
+    createdAt: version.createdAt.toISOString(),
+  };
 }
 
 async function transition(
@@ -140,6 +222,18 @@ async function transition(
   if (!permitted) return { error: "You don't have permission to do that." };
 
   await prisma.article.update({ where: { id }, data: updates });
+  if (typeof updates.status === "string" && updates.status !== article.status) {
+    await prisma.articleStatusHistory
+      .create({
+        data: {
+          articleId: id,
+          fromStatus: article.status,
+          toStatus: updates.status,
+          userId: session.user.id,
+        },
+      })
+      .catch(() => {});
+  }
   await logActivity({
     userId: session.user.id,
     action: opts.action,
@@ -152,14 +246,33 @@ async function transition(
   return { success: true };
 }
 
-/** Author: send a draft to editorial review. */
+/** Author: send a draft (or revision) to editorial review. */
 export async function submitForReview(id: string) {
   return transition(id, { status: "pending" }, { action: "article.submitted", requireOwn: true });
 }
 
 /** Editor+: send back to the author for changes. */
 export async function requestChanges(id: string) {
-  return transition(id, { status: "draft" }, { action: "article.changes_requested", permission: "publish" });
+  return transition(
+    id,
+    { status: "needs_revision" },
+    { action: "article.changes_requested", permission: "publish" }
+  );
+}
+
+/** Editor+: advance a pending article to fact checking. */
+export async function moveToFactCheck(id: string) {
+  return transition(id, { status: "fact_check" }, { action: "article.fact_check", permission: "publish" });
+}
+
+/** Editor+: fact check passed — on to SEO review. */
+export async function moveToSeoReview(id: string) {
+  return transition(id, { status: "seo_review" }, { action: "article.seo_review", permission: "publish" });
+}
+
+/** Editor+: fully approved and ready to publish or schedule. */
+export async function approveArticle(id: string) {
+  return transition(id, { status: "approved" }, { action: "article.approved", permission: "publish" });
 }
 
 export async function publishArticle(id: string) {

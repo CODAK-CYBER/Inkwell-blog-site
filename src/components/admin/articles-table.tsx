@@ -5,9 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal, Pin, Star } from "lucide-react";
 import {
+  approveArticle,
   archiveArticle,
   deleteArticleForever,
   duplicateArticle,
+  moveToFactCheck,
+  moveToSeoReview,
   publishArticle,
   requestChanges,
   restoreArticle,
@@ -36,7 +39,11 @@ export interface ArticleRow {
 const STATUS_VARIANT: Record<string, "accent" | "secondary" | "outline"> = {
   published: "accent",
   scheduled: "accent",
+  approved: "accent",
   pending: "secondary",
+  fact_check: "secondary",
+  seo_review: "secondary",
+  needs_revision: "outline",
   draft: "outline",
   archived: "outline",
   trashed: "outline",
@@ -186,17 +193,44 @@ export function ArticlesTable({ rows }: { rows: ArticleRow[] }) {
                       <div className="absolute right-0 top-8 z-20 w-52 rounded-lg border bg-popover p-1 text-sm shadow-lg">
                         <MenuLink href={`/articles/${row.slug}`}>Preview</MenuLink>
                         <MenuLink href={`/write/${row.id}`}>Edit</MenuLink>
+                        <MenuLink href={`/admin/articles/${row.id}/analytics`}>Analytics</MenuLink>
                         {row.status === "pending" && (
                           <>
+                            <MenuButton onClick={() => run(() => moveToFactCheck(row.id))}>
+                              Send to fact check
+                            </MenuButton>
                             <MenuButton onClick={() => run(() => publishArticle(row.id))}>
-                              Approve & publish
+                              Fast-track: publish
                             </MenuButton>
                             <MenuButton onClick={() => run(() => requestChanges(row.id))}>
                               Request changes
                             </MenuButton>
                           </>
                         )}
-                        {(row.status === "draft" || row.status === "archived") && (
+                        {row.status === "fact_check" && (
+                          <>
+                            <MenuButton onClick={() => run(() => moveToSeoReview(row.id))}>
+                              Pass fact check → SEO review
+                            </MenuButton>
+                            <MenuButton onClick={() => run(() => requestChanges(row.id))}>
+                              Request changes
+                            </MenuButton>
+                          </>
+                        )}
+                        {row.status === "seo_review" && (
+                          <>
+                            <MenuButton onClick={() => run(() => approveArticle(row.id))}>
+                              Approve
+                            </MenuButton>
+                            <MenuButton onClick={() => run(() => requestChanges(row.id))}>
+                              Request changes
+                            </MenuButton>
+                          </>
+                        )}
+                        {(row.status === "approved" ||
+                          row.status === "draft" ||
+                          row.status === "needs_revision" ||
+                          row.status === "archived") && (
                           <MenuButton onClick={() => run(() => publishArticle(row.id))}>
                             Publish
                           </MenuButton>

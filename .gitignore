@@ -47,3 +47,6 @@ next-env.d.ts
 prisma/dev.db*
 dev-emails/
 !.env.example
+
+# local media uploads (dev storage)
+public/uploads/

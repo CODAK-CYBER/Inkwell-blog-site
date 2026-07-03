@@ -136,6 +136,11 @@ export default async function ArticlePage({ params }: Props) {
         )}
 
         <div className="flex flex-wrap items-center gap-2">
+          {article.isBreaking && (
+            <Badge className="bg-destructive text-destructive-foreground">Breaking</Badge>
+          )}
+          {article.isPremium && <Badge variant="accent">Premium</Badge>}
+          {article.isSponsored && <Badge variant="outline">Sponsored</Badge>}
           {article.category && (
             <Link href={`/categories/${article.category.slug}`}>
               <Badge variant="accent">{article.category.name}</Badge>
@@ -196,16 +201,18 @@ export default async function ArticlePage({ params }: Props) {
           />
         </div>
 
-        <div className="mt-6 border-y py-2">
-          <EngagementBar
-            slug={slug}
-            title={article.title}
-            signedIn={Boolean(session)}
-            initialLiked={liked}
-            initialBookmarked={bookmarked}
-            initialLikeCount={likeCount}
-          />
-        </div>
+        {article.engagementEnabled && (
+          <div className="mt-6 border-y py-2">
+            <EngagementBar
+              slug={slug}
+              title={article.title}
+              signedIn={Boolean(session)}
+              initialLiked={liked}
+              initialBookmarked={bookmarked}
+              initialLikeCount={likeCount}
+            />
+          </div>
+        )}
 
         {article.coverImage ? (
           // eslint-disable-next-line @next/next/no-img-element

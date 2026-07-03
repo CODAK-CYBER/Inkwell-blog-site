@@ -28,6 +28,8 @@ export const siteConfig = {
       { label: "Trending", href: "/trending" },
       { label: "Collections", href: "/collections" },
       { label: "Authors", href: "/authors" },
+      { label: "Archive", href: "/archive" },
+      { label: "RSS Feed", href: "/feed.xml" },
       { label: "Search", href: "/search" },
     ],
     company: [

@@ -52,7 +52,18 @@ export default async function EditArticlePage({
         seoTitle: article.seoTitle ?? "",
         seoDescription: article.seoDescription ?? "",
         canonicalUrl: article.canonicalUrl ?? "",
+        focusKeyword: article.focusKeyword ?? "",
         status: article.status,
+        isBreaking: article.isBreaking,
+        isPremium: article.isPremium,
+        isSponsored: article.isSponsored,
+        engagementEnabled: article.engagementEnabled,
+        allowComments: article.allowComments,
+        expiresAt: article.expiresAt
+          ? new Date(article.expiresAt.getTime() - article.expiresAt.getTimezoneOffset() * 60000)
+              .toISOString()
+              .slice(0, 16)
+          : "",
       }}
     />
   );
