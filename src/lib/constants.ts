@@ -48,6 +48,36 @@ export type Role = (typeof ROLES)[number];
 
 export const PROFILE_VISIBILITY = ["public", "private"] as const;
 
+export const REACTIONS = [
+  { type: "like", emoji: "👍", label: "Like" },
+  { type: "love", emoji: "❤️", label: "Love" },
+  { type: "insightful", emoji: "💡", label: "Insightful" },
+  { type: "funny", emoji: "😄", label: "Funny" },
+  { type: "celebrate", emoji: "🎉", label: "Celebrate" },
+] as const;
+
+export type ReactionType = (typeof REACTIONS)[number]["type"];
+
+/** Comments containing these are held for moderation (expand as needed). */
+export const BLOCKED_WORDS = [
+  "idiot",
+  "stupid",
+  "moron",
+  "scam",
+  "spam",
+  "casino",
+  "viagra",
+];
+
+export const REPORT_REASONS = [
+  "Spam or misleading",
+  "Harassment or hate",
+  "Off-topic",
+  "Misinformation",
+  "Copyright violation",
+  "Other",
+] as const;
+
 export const LANGUAGES = [
   { value: "en", label: "English" },
   { value: "fr", label: "Français" },

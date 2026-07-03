@@ -276,11 +276,69 @@ export async function approveArticle(id: string) {
 }
 
 export async function publishArticle(id: string) {
-  return transition(
+  const result = await transition(
     id,
     { status: "published", publishedAt: new Date(), scheduledFor: null },
     { action: "article.published", permission: "publish" }
   );
+  if ("success" in result && result.success) {
+    fanOutPublished(id).catch((err) => console.error("publish fan-out failed:", err));
+  }
+  return result;
+}
+
+/** Notify followers (author + category) and, for breaking news, opted-in readers. */
+async function fanOutPublished(id: string) {
+  const { notify, followerIdsOf } = await import("@/lib/notify");
+  const { checkAchievements } = await import("@/lib/achievements");
+
+  const article = await prisma.article.findUnique({
+    where: { id },
+    include: {
+      author: { select: { id: true, name: true, username: true } },
+      category: { select: { slug: true, name: true } },
+    },
+  });
+  if (!article) return;
+
+  checkAchievements(article.authorId, "publish").catch(() => {});
+
+  const [authorFollowers, categoryFollowers] = await Promise.all([
+    followerIdsOf("author", article.author.username ?? article.authorId),
+    article.category ? followerIdsOf("category", article.category.slug) : Promise.resolve([]),
+  ]);
+  const followers = [...new Set([...authorFollowers, ...categoryFollowers])].filter(
+    (uid) => uid !== article.authorId
+  );
+
+  if (followers.length) {
+    await notify({
+      userIds: followers,
+      type: "new_article",
+      title: `New from ${article.author.name}: ${article.title}`,
+      body: article.excerpt.slice(0, 140),
+      url: `/articles/${article.slug}`,
+      priority: "medium",
+    });
+  }
+
+  if (article.isBreaking) {
+    const optedIn = await prisma.notificationPreferences.findMany({
+      where: { breakingNews: true },
+      select: { userId: true },
+    });
+    if (optedIn.length) {
+      await notify({
+        userIds: optedIn.map((o) => o.userId),
+        type: "breaking",
+        title: `🔴 Breaking: ${article.title}`,
+        body: article.excerpt.slice(0, 140),
+        url: `/articles/${article.slug}`,
+        priority: "high",
+        email: true,
+      });
+    }
+  }
 }
 
 export async function scheduleArticle(id: string, when: string) {

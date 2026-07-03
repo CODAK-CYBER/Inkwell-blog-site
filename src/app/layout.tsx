@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { BreakingNews } from "@/components/layout/breaking-news";
+import { AnnouncementBanner } from "@/components/layout/announcement-banner";
 import { CookieConsent } from "@/components/cookie-consent";
 import "./globals.css";
 
@@ -73,6 +74,7 @@ export default function RootLayout({
     >
       <body className="flex min-h-screen flex-col">
         <ThemeProvider>
+          <AnnouncementBanner />
           <BreakingNews />
           <Header />
           <main className="flex-1">{children}</main>

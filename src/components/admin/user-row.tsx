@@ -3,8 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Ban, MoreHorizontal, ShieldCheck, Undo2 } from "lucide-react";
+import { Ban, BadgeCheck, MoreHorizontal, ShieldCheck, Undo2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { setUserVerified } from "@/lib/actions/moderation";
 import { ROLES } from "@/lib/constants";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ interface AdminUser {
   banned: boolean;
   banReason: string | null;
   emailVerified: boolean;
+  verified: boolean;
   twoFactorEnabled: boolean;
   createdAt: string;
   loginCount: number;
@@ -90,6 +92,9 @@ export function UserRow({ user, isSelf }: { user: AdminUser; isSelf: boolean }) 
                 </Link>
               ) : (
                 user.name
+              )}
+              {user.verified && (
+                <BadgeCheck className="size-3.5 shrink-0 text-accent" aria-label="Verified user" />
               )}
               {user.twoFactorEnabled && (
                 <ShieldCheck className="size-3.5 shrink-0 text-accent" aria-label="2FA enabled" />
@@ -168,6 +173,13 @@ export function UserRow({ user, isSelf }: { user: AdminUser; isSelf: boolean }) 
                     Ban user
                   </button>
                 )}
+                <button
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary"
+                  onClick={() => run(() => setUserVerified(user.id, !user.verified))}
+                >
+                  <BadgeCheck className="size-4" />
+                  {user.verified ? "Remove verification" : "Verify user"}
+                </button>
                 <button
                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary"
                   onClick={revokeSessions}

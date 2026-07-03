@@ -48,6 +48,9 @@ model User {
   language    String  @default("en")
   timezone    String  @default("UTC")
 
+  // Trust & verification
+  verified Boolean @default(false)
+
   // Preferences
   profileVisibility     String  @default("public") // public | private
   showReadingActivity   Boolean @default(true)
@@ -58,6 +61,10 @@ model User {
   articles           Article[]
   activityLogs       ActivityLog[]
   searchHistory      SearchHistory[]
+  comments           Comment[]
+  commentReactions   CommentReaction[]
+  notifications      Notification[]
+  reportsMade        Report[] @relation("reporter")
   sessions           Session[]
   accounts           Account[]
   twoFactors         TwoFactor[]
@@ -212,6 +219,7 @@ model Article {
   versions      ArticleVersion[]
   statusHistory ArticleStatusHistory[]
   mediaUsage    MediaUsage[]
+  comments      Comment[]
 
   @@index([status, publishedAt])
   @@index([authorId])
@@ -421,11 +429,13 @@ model Bookmark {
   @@map("bookmark")
 }
 
+// One reaction per user per article; `type` distinguishes like/love/insightful/…
 model Like {
   id          String   @id @default(cuid())
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   articleSlug String
+  type        String   @default("like") // like | love | insightful | funny | celebrate
   createdAt   DateTime @default(now())
 
   @@unique([userId, articleSlug])
@@ -489,6 +499,100 @@ model NotificationPreferences {
   categoryTopics String? // JSON: category slugs to notify about
 
   @@map("notification_preferences")
+}
+
+// ------------------------------------------------------------------
+// Community (Phase 7)
+// ------------------------------------------------------------------
+
+// Comment.status: visible | flagged (word filter / reported, hidden) | hidden (moderator)
+model Comment {
+  id         String    @id @default(cuid())
+  articleId  String
+  article    Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId   String?
+  parent     Comment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies    Comment[] @relation("CommentThread")
+  content    String
+  status     String    @default("visible")
+  pinned     Boolean   @default(false)
+  isOfficial Boolean   @default(false) // staff response marker
+  editedAt   DateTime?
+  createdAt  DateTime  @default(now())
+
+  reactions CommentReaction[]
+
+  @@index([articleId, createdAt])
+  @@index([status])
+  @@map("comment")
+}
+
+model CommentReaction {
+  commentId String
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([commentId, userId])
+  @@map("comment_reaction")
+}
+
+// Report.targetType: comment | article | user; status: open | resolved | dismissed
+model Report {
+  id           String    @id @default(cuid())
+  reporterId   String
+  reporter     User      @relation("reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType   String
+  targetId     String
+  reason       String
+  detail       String?
+  status       String    @default("open")
+  resolvedById String?
+  resolvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([status, createdAt])
+  @@map("report")
+}
+
+// ------------------------------------------------------------------
+// Communication (Phase 8)
+// ------------------------------------------------------------------
+
+// Notification.priority: critical | high | medium | low
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // new_article | breaking | reply | mention | follower | achievement | announcement | security
+  title     String
+  body      String?
+  url       String?
+  priority  String   @default("medium")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read, createdAt])
+  @@map("notification")
+}
+
+// Announcement.level: info | warning | critical; audience: all | premium | authors | staff
+model Announcement {
+  id         String    @id @default(cuid())
+  title      String
+  body       String
+  level      String    @default("info")
+  audience   String    @default("all")
+  showBanner Boolean   @default(true)
+  active     Boolean   @default(true)
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([active, createdAt])
+  @@map("announcement")
 }
 
 // ------------------------------------------------------------------

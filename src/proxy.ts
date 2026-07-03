@@ -27,5 +27,6 @@ export const config = {
     "/saved/:path*",
     "/write/:path*",
     "/dashboard/:path*",
+    "/notifications/:path*",
   ],
 };

@@ -2,54 +2,82 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Bookmark, Heart, Share2 } from "lucide-react";
+import { Bookmark, Flag, Share2 } from "lucide-react";
 import { recordReading, toggleBookmark, toggleLike } from "@/lib/actions/engagement";
+import { reportTarget } from "@/lib/actions/comments";
+import { REACTIONS, REPORT_REASONS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface Props {
   slug: string;
+  articleId: string;
   title: string;
   signedIn: boolean;
-  initialLiked: boolean;
+  initialReaction: string | null;
   initialBookmarked: boolean;
   initialLikeCount: number;
 }
 
+const SHARE_TARGETS = [
+  { label: "WhatsApp", href: (u: string, t: string) => `https://wa.me/?text=${t}%20${u}` },
+  { label: "X", href: (u: string, t: string) => `https://x.com/intent/tweet?url=${u}&text=${t}` },
+  { label: "Facebook", href: (u: string) => `https://www.facebook.com/sharer/sharer.php?u=${u}` },
+  { label: "LinkedIn", href: (u: string) => `https://www.linkedin.com/sharing/share-offsite/?url=${u}` },
+  { label: "Telegram", href: (u: string, t: string) => `https://t.me/share/url?url=${u}&text=${t}` },
+  { label: "Email", href: (u: string, t: string) => `mailto:?subject=${t}&body=${u}` },
+];
+
 export function EngagementBar({
   slug,
+  articleId,
   title,
   signedIn,
-  initialLiked,
+  initialReaction,
   initialBookmarked,
   initialLikeCount,
 }: Props) {
   const router = useRouter();
-  const [liked, setLiked] = React.useState(initialLiked);
+  const [reaction, setReaction] = React.useState<string | null>(initialReaction);
   const [bookmarked, setBookmarked] = React.useState(initialBookmarked);
   const [likeCount, setLikeCount] = React.useState(initialLikeCount);
-  const [shared, setShared] = React.useState(false);
+  const [showReactions, setShowReactions] = React.useState(false);
+  const [showShare, setShowShare] = React.useState(false);
+  const [showReport, setShowReport] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const [notice, setNotice] = React.useState<string | null>(null);
+  const barRef = React.useRef<HTMLDivElement>(null);
 
-  // Record the visit in reading history once per page view.
   React.useEffect(() => {
     if (signedIn) recordReading(slug).catch(() => {});
   }, [signedIn, slug]);
 
-  function gate() {
-    router.push(`/login?next=/articles/${slug}`);
-  }
+  React.useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (barRef.current && !barRef.current.contains(e.target as Node)) {
+        setShowReactions(false);
+        setShowShare(false);
+        setShowReport(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
 
-  async function onLike() {
+  const gate = () => router.push(`/login?next=/articles/${slug}`);
+
+  async function react(type: string) {
     if (!signedIn) return gate();
-    setLiked((v) => !v);
-    setLikeCount((c) => c + (liked ? -1 : 1));
+    setShowReactions(false);
+    const prev = reaction;
+    setReaction(prev === type ? null : type);
+    setLikeCount((c) => c + (prev === type ? -1 : prev ? 0 : 1));
     try {
-      const res = await toggleLike(slug);
-      setLiked(res.liked);
+      const res = await toggleLike(slug, type);
+      setReaction(res.reaction);
       setLikeCount(res.count);
     } catch {
-      setLiked(liked);
-      setLikeCount(likeCount);
+      setReaction(prev);
     }
   }
 
@@ -64,49 +92,128 @@ export function EngagementBar({
     }
   }
 
-  async function onShare() {
-    const url = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title, url });
-        return;
-      } catch {
-        // fall through to clipboard
-      }
-    }
-    await navigator.clipboard.writeText(url);
-    setShared(true);
-    setTimeout(() => setShared(false), 2000);
-  }
+  const current = REACTIONS.find((r) => r.type === reaction);
 
   return (
-    <div className="flex items-center gap-1">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onLike}
-        aria-pressed={liked}
-        aria-label={liked ? "Unlike article" : "Like article"}
-        className={cn(liked && "text-accent")}
-      >
-        <Heart className={cn(liked && "fill-current")} />
-        {likeCount > 0 ? likeCount : "Like"}
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onBookmark}
-        aria-pressed={bookmarked}
-        aria-label={bookmarked ? "Remove bookmark" : "Bookmark article"}
-        className={cn(bookmarked && "text-accent")}
-      >
-        <Bookmark className={cn(bookmarked && "fill-current")} />
-        {bookmarked ? "Saved" : "Save"}
-      </Button>
-      <Button variant="ghost" size="sm" onClick={onShare} aria-label="Share article">
-        <Share2 />
-        {shared ? "Copied!" : "Share"}
-      </Button>
+    <div ref={barRef} className="relative">
+      <div className="flex flex-wrap items-center gap-1">
+        {/* Reaction picker */}
+        <div className="relative">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-haspopup="true"
+            aria-expanded={showReactions}
+            className={cn(reaction && "text-accent")}
+            onClick={() => setShowReactions((v) => !v)}
+          >
+            <span className="text-base leading-none">{current?.emoji ?? "👍"}</span>
+            {likeCount > 0 ? likeCount : "React"}
+          </Button>
+          {showReactions && (
+            <div className="absolute bottom-10 left-0 z-20 flex gap-1 rounded-full border bg-popover p-1.5 shadow-lg">
+              {REACTIONS.map((r) => (
+                <button
+                  key={r.type}
+                  aria-label={r.label}
+                  title={r.label}
+                  onClick={() => react(r.type)}
+                  className={cn(
+                    "rounded-full p-1.5 text-xl leading-none transition-transform hover:scale-125",
+                    reaction === r.type && "bg-accent-soft"
+                  )}
+                >
+                  {r.emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBookmark}
+          aria-pressed={bookmarked}
+          className={cn(bookmarked && "text-accent")}
+        >
+          <Bookmark className={cn(bookmarked && "fill-current")} />
+          {bookmarked ? "Saved" : "Save"}
+        </Button>
+
+        {/* Share */}
+        <div className="relative">
+          <Button variant="ghost" size="sm" aria-haspopup="true" aria-expanded={showShare} onClick={() => setShowShare((v) => !v)}>
+            <Share2 />
+            {copied ? "Copied!" : "Share"}
+          </Button>
+          {showShare && (
+            <div className="absolute bottom-10 left-0 z-20 w-44 rounded-lg border bg-popover p-1 shadow-lg">
+              {SHARE_TARGETS.map((target) => (
+                <a
+                  key={target.label}
+                  href={target.href(encodeURIComponent(window.location.href), encodeURIComponent(title))}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-md px-3 py-1.5 text-sm hover:bg-secondary"
+                  onClick={() => setShowShare(false)}
+                >
+                  {target.label}
+                </a>
+              ))}
+              <button
+                className="block w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-secondary"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(window.location.href);
+                  setCopied(true);
+                  setShowShare(false);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+              >
+                Copy link
+              </button>
+              {typeof navigator !== "undefined" && "share" in navigator && (
+                <button
+                  className="block w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-secondary"
+                  onClick={() => {
+                    navigator.share({ title, url: window.location.href }).catch(() => {});
+                    setShowShare(false);
+                  }}
+                >
+                  More…
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Report */}
+        <div className="relative">
+          <Button variant="ghost" size="sm" aria-haspopup="true" aria-expanded={showReport} onClick={() => (signedIn ? setShowReport((v) => !v) : gate())}>
+            <Flag />
+            Report
+          </Button>
+          {showReport && (
+            <div className="absolute bottom-10 left-0 z-20 w-52 rounded-lg border bg-popover p-1 shadow-lg">
+              {REPORT_REASONS.map((reason) => (
+                <button
+                  key={reason}
+                  className="block w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-secondary"
+                  onClick={async () => {
+                    setShowReport(false);
+                    const res = await reportTarget("article", articleId, reason);
+                    setNotice("notice" in res && res.notice ? res.notice : res.error ?? null);
+                    setTimeout(() => setNotice(null), 4000);
+                  }}
+                >
+                  {reason}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      {notice && <p className="mt-1 text-xs text-muted-foreground">{notice}</p>}
     </div>
   );
 }

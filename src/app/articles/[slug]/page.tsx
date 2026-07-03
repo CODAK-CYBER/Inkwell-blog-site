@@ -11,6 +11,7 @@ import { hasPermission } from "@/lib/rbac";
 import { Container } from "@/components/ui/container";
 import { Badge } from "@/components/ui/badge";
 import { EngagementBar } from "@/components/articles/engagement-bar";
+import { CommentsSection } from "@/components/comments/comments-section";
 import { ReadingExperience } from "@/components/articles/reading-experience";
 import { TableOfContents } from "@/components/articles/table-of-contents";
 import { ArticleCard } from "@/components/articles/article-card";
@@ -71,11 +72,13 @@ export default async function ArticlePage({ params }: Props) {
 
   const userId = session?.user.id;
   const authorKey = article.author.username ?? article.authorId;
-  const [likeCount, liked, bookmarked, followingAuthor, history, related] = await Promise.all([
+  const [likeCount, myReaction, bookmarked, followingAuthor, history, related] = await Promise.all([
     prisma.like.count({ where: { articleSlug: slug } }),
     userId
-      ? prisma.like.findUnique({ where: { userId_articleSlug: { userId, articleSlug: slug } } }).then(Boolean)
-      : false,
+      ? prisma.like
+          .findUnique({ where: { userId_articleSlug: { userId, articleSlug: slug } } })
+          .then((row) => row?.type ?? null)
+      : null,
     userId
       ? prisma.bookmark.findUnique({ where: { userId_articleSlug: { userId, articleSlug: slug } } }).then(Boolean)
       : false,
@@ -205,9 +208,10 @@ export default async function ArticlePage({ params }: Props) {
           <div className="mt-6 border-y py-2">
             <EngagementBar
               slug={slug}
+              articleId={article.id}
               title={article.title}
               signedIn={Boolean(session)}
-              initialLiked={liked}
+              initialReaction={myReaction}
               initialBookmarked={bookmarked}
               initialLikeCount={likeCount}
             />
@@ -237,6 +241,14 @@ export default async function ArticlePage({ params }: Props) {
               </Link>
             ))}
           </div>
+        )}
+
+        {article.allowComments ? (
+          <CommentsSection articleId={article.id} session={session} />
+        ) : (
+          <p className="mt-12 rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+            Comments are closed on this article.
+          </p>
         )}
       </Container>
 

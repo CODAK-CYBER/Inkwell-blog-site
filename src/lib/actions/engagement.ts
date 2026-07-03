@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
+import { notify } from "@/lib/notify";
+import { checkAchievements } from "@/lib/achievements";
 
 async function requireUserId() {
   const session = await getServerSession();
@@ -19,23 +21,37 @@ export async function toggleBookmark(articleSlug: string) {
     await prisma.bookmark.delete({ where: { id: existing.id } });
   } else {
     await prisma.bookmark.create({ data: { userId, articleSlug } });
+    checkAchievements(userId, "save").catch(() => {});
   }
   revalidatePath("/saved");
   return { bookmarked: !existing };
 }
 
-export async function toggleLike(articleSlug: string) {
+/**
+ * One reaction per user per article. Same type toggles off; a different
+ * type switches the reaction.
+ */
+export async function toggleLike(articleSlug: string, type = "like") {
   const userId = await requireUserId();
   const existing = await prisma.like.findUnique({
     where: { userId_articleSlug: { userId, articleSlug } },
   });
-  if (existing) {
+
+  let current: string | null;
+  if (existing && existing.type === type) {
     await prisma.like.delete({ where: { id: existing.id } });
+    current = null;
+  } else if (existing) {
+    await prisma.like.update({ where: { id: existing.id }, data: { type } });
+    current = type;
   } else {
-    await prisma.like.create({ data: { userId, articleSlug } });
+    await prisma.like.create({ data: { userId, articleSlug, type } });
+    current = type;
+    checkAchievements(userId, "reaction").catch(() => {});
   }
+
   const count = await prisma.like.count({ where: { articleSlug } });
-  return { liked: !existing, count };
+  return { liked: current !== null, reaction: current, count };
 }
 
 /** Fire-and-forget from the article page; also powers "reading history". */
@@ -47,6 +63,7 @@ export async function recordReading(articleSlug: string, progress = 0) {
     create: { userId: session.user.id, articleSlug, progress },
     update: { readAt: new Date(), progress: { set: Math.max(progress, 0) } },
   });
+  checkAchievements(session.user.id, "read").catch(() => {});
 }
 
 // ---------------- Reading lists ----------------
@@ -124,6 +141,25 @@ export async function toggleFollow(targetType: "author" | "category" | "tag", ta
     await prisma.follow.delete({ where: { id: existing.id } });
   } else {
     await prisma.follow.create({ data: { userId, targetType, targetKey } });
+    // New-follower notification for authors
+    if (targetType === "author") {
+      const [followed, follower] = await Promise.all([
+        prisma.user.findFirst({
+          where: { OR: [{ username: targetKey }, { id: targetKey }] },
+          select: { id: true },
+        }),
+        prisma.user.findUnique({ where: { id: userId }, select: { name: true, username: true } }),
+      ]);
+      if (followed && followed.id !== userId && follower) {
+        notify({
+          userIds: [followed.id],
+          type: "follower",
+          title: `${follower.name} started following you`,
+          url: follower.username ? `/u/${follower.username}` : undefined,
+          priority: "high",
+        }).catch(() => {});
+      }
+    }
   }
   return { following: !existing };
 }

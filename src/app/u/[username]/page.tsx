@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CalendarDays, Globe, Lock, MapPin } from "lucide-react";
+import { BadgeCheck, CalendarDays, Globe, Lock, MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
 import { TOPICS } from "@/lib/constants";
@@ -69,7 +69,7 @@ export default async function PublicProfilePage({ params }: Props) {
     );
   }
 
-  const [interests, followerCount, followingSelf, publishedArticles] = await Promise.all([
+  const [interests, followerCount, followingSelf, publishedArticles, badges] = await Promise.all([
     user.showReadingActivity
       ? prisma.userInterest.findMany({ where: { userId: user.id } })
       : Promise.resolve([]),
@@ -94,6 +94,11 @@ export default async function PublicProfilePage({ params }: Props) {
       include: articleInclude,
       orderBy: { publishedAt: "desc" },
       take: 9,
+    }),
+    prisma.userBadge.findMany({
+      where: { userId: user.id },
+      include: { badge: true },
+      orderBy: { awardedAt: "desc" },
     }),
   ]);
 
@@ -130,7 +135,12 @@ export default async function PublicProfilePage({ params }: Props) {
               )}
             </span>
             <div className="pb-1">
-              <h1 className="text-2xl font-bold">{user.name}</h1>
+              <h1 className="flex items-center gap-2 text-2xl font-bold">
+                {user.name}
+                {user.verified && (
+                  <BadgeCheck className="size-5 text-accent" aria-label="Verified" />
+                )}
+              </h1>
               <p className="text-sm text-muted-foreground">
                 @{user.displayUsername ?? user.username ?? user.id}
               </p>
@@ -213,6 +223,26 @@ export default async function PublicProfilePage({ params }: Props) {
                   </a>
                 );
               })}
+          </div>
+        )}
+
+        {badges.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Achievements
+            </h2>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {badges.map(({ badge, awardedAt }) => (
+                <span
+                  key={badge.id}
+                  title={`${badge.description} · ${awardedAt.toLocaleDateString()}`}
+                  className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm"
+                >
+                  <span>{badge.icon}</span>
+                  {badge.name}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 

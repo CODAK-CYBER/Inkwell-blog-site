@@ -49,7 +49,7 @@ export default async function DashboardPage() {
   if (!session) redirect("/login?next=/dashboard");
   const userId = session.user.id;
 
-  const [history, likes, bookmarks, follows, interests, streak, recommendations, user] =
+  const [history, likes, bookmarks, follows, interests, streak, recommendations, user, badges] =
     await Promise.all([
       prisma.readingHistory.findMany({
         where: { userId },
@@ -62,6 +62,11 @@ export default async function DashboardPage() {
       getReadingStreak(userId),
       getRecommendations(userId, 3),
       prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+      prisma.userBadge.findMany({
+        where: { userId },
+        include: { badge: true },
+        orderBy: { awardedAt: "desc" },
+      }),
     ]);
 
   const readSlugs = history.map((h) => h.articleSlug);
@@ -178,6 +183,29 @@ export default async function DashboardPage() {
                 </li>
               ))}
             </ul>
+          </div>
+
+          {/* Achievements */}
+          <div className="rounded-xl border bg-card p-5">
+            <h2 className="font-serif text-lg font-semibold">Achievements</h2>
+            {badges.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {badges.map(({ badge }) => (
+                  <span
+                    key={badge.id}
+                    title={badge.description}
+                    className="flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-sm"
+                  >
+                    <span>{badge.icon}</span>
+                    {badge.name}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Read, react and comment to unlock achievements.
+              </p>
+            )}
           </div>
 
           {/* Followed topics */}

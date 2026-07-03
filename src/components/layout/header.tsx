@@ -4,6 +4,7 @@ import { Logo } from "@/components/layout/logo";
 import { MainNav } from "@/components/layout/main-nav";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { UserMenu } from "@/components/layout/user-menu";
 import { SearchDialog } from "@/components/search/search-dialog";
 
@@ -26,6 +27,7 @@ export async function Header() {
         <div className="flex items-center gap-2">
           <SearchDialog categories={popularCategories} />
           <ThemeToggle />
+          <NotificationBell />
           <UserMenu />
           <MobileNav />
         </div>

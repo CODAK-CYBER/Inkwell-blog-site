@@ -56,7 +56,7 @@ const groups: Array<{
       { label: "Collections", href: "/admin/collections", Icon: Layers },
       { label: "Media library", href: "/admin/media", Icon: Image },
       { label: "Calendar", href: "/admin/calendar", Icon: CalendarDays },
-      { label: "Comments", Icon: MessageSquare, phase: 7 },
+      { label: "Moderation", href: "/admin/moderation", Icon: MessageSquare },
       { label: "Homepage manager", Icon: LayoutTemplate, phase: 5 },
     ],
   },
@@ -70,8 +70,8 @@ const groups: Array<{
   {
     title: "Growth",
     items: [
-      { label: "Newsletter", Icon: Mail, phase: 8 },
-      { label: "Notifications", Icon: Bell, phase: 8 },
+      { label: "Communications", href: "/admin/communications", Icon: Mail, adminOnly: true },
+      { label: "Announcements", href: "/admin/announcements", Icon: Bell, adminOnly: true },
       { label: "Advertisements", Icon: Megaphone, phase: 10 },
       { label: "SEO", Icon: Search, phase: 12 },
       { label: "Analytics", Icon: BarChart3, phase: 11 },
