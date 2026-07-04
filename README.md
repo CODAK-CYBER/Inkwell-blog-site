@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Inkwell — Premium Publishing Platform
 
-## Getting Started
+A full-featured, community-driven publishing platform built with Next.js — think Medium meets a modern newsroom CMS. Every reader gets a personalized experience; every writer gets professional publishing tools; every admin gets a real editorial operation.
 
-First, run the development server:
+> 📚 **Documentation:** [Status](PROJECT_STATUS.md) · [Roadmap](PROJECT_ROADMAP.md) · [Architecture](ARCHITECTURE.md) · [Database](DATABASE_SCHEMA.md) · [API](API_DOCUMENTATION.md) · [Changelog](CHANGELOG.md)
+
+## Highlights
+
+- **Personalized homepage** — recommendations, continue-reading, trending, and interest-based feeds per user
+- **Full editorial pipeline** — draft → review → fact check → SEO review → approved → published/scheduled, permission-controlled with audit history
+- **Writing studio** — markdown editor with live preview, media picker, autosave, version history, templates, SEO scoring, and a pre-publish readiness checklist
+- **Digital asset management** — uploads with duplicate detection, folders, usage tracking, and asset-intelligence reports
+- **Community** — nested comments with @mentions, multi-type reactions, achievements, follows, reading lists, and moderation tools
+- **Communication** — in-app notification center, event-driven fan-out (new articles, replies, mentions, breaking news), announcements, and weekly digests
+- **Complete auth** — email/password with verification, social login (env-gated), 2FA, RBAC with 7 roles, session/device management
+
+## Stack
+
+| Layer | Choice |
+| --- | --- |
+| Framework | Next.js 16 (App Router, Server Actions) + React 19 + TypeScript |
+| Styling | Tailwind CSS v4 + Framer Motion |
+| Database | Prisma 6 — SQLite in dev, PostgreSQL-ready for production |
+| Auth | better-auth (sessions, OAuth, 2FA, admin plugin, custom RBAC) |
+| Email | Resend (dev fallback: local outbox in `dev-emails/`) |
+| Storage | Local disk in dev; Cloudinary via env keys |
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env       # fill in BETTER_AUTH_SECRET (any 32+ char string)
+npx prisma db push         # create the SQLite database
+npm run db:seed            # categories + sample articles
+npm run dev                # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**The first account you register automatically becomes superadmin.** Verification emails print to the terminal (and save to `dev-emails/`) until you add a `RESEND_API_KEY`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Development server |
+| `npm run build` | Production build |
+| `npm run db:seed` | Seed categories and sample articles |
+| `npm run lint` | ESLint |
 
-## Learn More
+### Environment
 
-To learn more about Next.js, take a look at the following resources:
+See [.env.example](.env.example) for all options: Resend (email), Google/GitHub/Apple OAuth, and Cloudinary (media storage). Everything works in dev with only `BETTER_AUTH_SECRET` set.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Key entry points
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| URL | What it is |
+| --- | --- |
+| `/` | Personalized homepage (general homepage for guests) |
+| `/write` | Writing studio (authors and above) |
+| `/admin` | Admin dashboard — articles, media, moderation, users, announcements… |
+| `/dashboard` | Reader dashboard — stats, streak, achievements |
+| `/feed.xml` | RSS feed |
