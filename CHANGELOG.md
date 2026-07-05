@@ -2,6 +2,37 @@
 
 One entry per completed phase. Format: newest first. Commit hashes reference this repository's history.
 
+## Flutterwave payment integration (2026-07-04)
+
+- Flutterwave chosen as the sole payment provider (Stripe/Paystack references removed)
+- Hosted checkout for memberships and donations (`src/lib/payments/flutterwave.ts`); customers pay via card, bank transfer, USSD, or mobile money
+- `/api/payments/callback` (server-side verification + redirect notices) and `/api/payments/webhook` (`verif-hash` validated, re-verified against the API) — both run the same idempotent fulfillment keyed on `tx_ref` (`Donation.txRef` added)
+- Guest donors provide an email in live mode; success/canceled/failed notices on `/membership` and `/support`
+- Env: `FLUTTERWAVE_SECRET_KEY`, `FLUTTERWAVE_SECRET_HASH`, `PAYMENT_CURRENCY`; without keys, the instant dev checkout remains
+
+## Phases 9–11 — Admin Operations, Monetization & Analytics (2026-07-04)
+
+**Platform operations (Phase 9)**
+- Platform settings (`/admin/settings`): maintenance mode (enforced sitewide with staff bypass + notice bar), registration toggle (enforced at UI and auth API), platform-wide comments toggle, support email
+- Security operations center (`/admin/security`): active sessions, 2FA adoption, sign-in activity, top IPs, warnings issued
+- User management additions: formal warnings (user notified, critical priority), internal staff notes, CSV export
+- Backups (`/admin/backups`): SQLite snapshots with download/delete (production: managed Postgres backups)
+- Executive dashboard upgrade: online-now users, moderation queue, system health (uptime/memory/storage), revenue summary
+- Activity logs: search + CSV export; admin exports API (`/api/admin/export?dataset=users|activity|revenue`)
+
+**Monetization (Phase 10)**
+- Membership platform (`/membership`): Free / Premium monthly / Premium yearly with dev checkout (payment-provider adapter seam), self-service cancel, admin comp/cancel at `/admin/memberships`
+- Premium paywall: `isPremium` articles show a fading teaser + upgrade CTA for non-members; staff/authors/premium read in full
+- Ads: weighted-rotation ad slots (homepage banner + below articles) with impression/click tracking, scheduling windows, AdSense-compatible HTML embeds, `/admin/ads`; **premium members see no ads**
+- Affiliate links: cloaked `/go/{code}` redirects with click tracking, `/admin/affiliates`, automatic on-article disclosure
+- Donations (`/support`) with messages; revenue dashboard (`/admin/revenue`): MRR, ARPU, conversion, donations, ad CTR, affiliate clicks
+
+**Analytics & BI (Phase 11)**
+- Audience-enriched view events (device/browser/language/referrer) and search result counts
+- `/admin/analytics`: DAU/MAU, reader retention, read depth, engagement; audience breakdowns; top content; author performance; community stats; popular + zero-result searches; user growth
+- **AI insight engine** (heuristics over real data): best publishing day, category momentum, cross-category reader affinity, read-depth guidance, content gaps from failed searches
+- Traffic forecast: 6 observed weeks + 4-week linear projection
+
 ## Phases 7–8 — Community & Communication (`b1c4df4`, 2026-07-03)
 
 **Community**

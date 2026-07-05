@@ -33,6 +33,9 @@
 | Achievements | `src/lib/achievements.ts` | Badge definitions seeded lazily; awarded on comment/read/save/reaction/publish events. |
 | Quality/SEO | `src/lib/quality.ts` | Readiness checklist, SEO score /100, Flesch-style readability. Pure functions — run live in the editor client. |
 | Digest | `src/lib/digest.ts` | Weekly top articles personalized per subscriber's interests. Manual admin trigger; cron in production. |
+| Insights | `src/lib/insights.ts` | Heuristic "AI insights" (best publishing day, category momentum, reader affinity, content gaps) + linear traffic forecast. |
+| Monetization | `src/lib/monetization.ts` + `actions/billing.ts` + `payments/flutterwave.ts` | Plan definitions, premium-access checks, and **Flutterwave** checkout: hosted payment link → callback + webhook both verify server-to-server and run idempotent fulfillment (keyed on tx_ref). Without `FLUTTERWAVE_SECRET_KEY`, the instant dev checkout activates instead. |
+| Settings | `src/lib/settings.ts` | Key-value platform config with defaults; maintenance mode enforced by `MaintenanceGate` in the root layout (proxy forwards `x-pathname`). |
 
 ## Folder structure
 

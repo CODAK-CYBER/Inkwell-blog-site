@@ -64,7 +64,7 @@ const groups: Array<{
     title: "People",
     items: [
       { label: "Users & roles", href: "/admin/users", Icon: Users, adminOnly: true },
-      { label: "Memberships", Icon: CreditCard, phase: 10 },
+      { label: "Memberships", href: "/admin/memberships", Icon: CreditCard, adminOnly: true },
     ],
   },
   {
@@ -72,18 +72,18 @@ const groups: Array<{
     items: [
       { label: "Communications", href: "/admin/communications", Icon: Mail, adminOnly: true },
       { label: "Announcements", href: "/admin/announcements", Icon: Bell, adminOnly: true },
-      { label: "Advertisements", Icon: Megaphone, phase: 10 },
-      { label: "SEO", Icon: Search, phase: 12 },
-      { label: "Analytics", Icon: BarChart3, phase: 11 },
-      { label: "Revenue", Icon: Wallet, phase: 10 },
+      { label: "Advertisements", href: "/admin/ads", Icon: Megaphone, adminOnly: true },
+      { label: "Affiliate links", href: "/admin/affiliates", Icon: Search, adminOnly: true },
+      { label: "Analytics", href: "/admin/analytics", Icon: BarChart3, adminOnly: true },
+      { label: "Revenue", href: "/admin/revenue", Icon: Wallet, adminOnly: true },
     ],
   },
   {
     title: "System",
     items: [
-      { label: "Security center", Icon: Shield, phase: 13 },
-      { label: "Settings", Icon: Settings, phase: 13 },
-      { label: "Backups", Icon: Database, phase: 13 },
+      { label: "Security center", href: "/admin/security", Icon: Shield, adminOnly: true },
+      { label: "Settings", href: "/admin/settings", Icon: Settings, adminOnly: true },
+      { label: "Backups", href: "/admin/backups", Icon: Database, adminOnly: true },
       { label: "AI tools", Icon: Bot, phase: 13 },
       { label: "API & webhooks", Icon: KeyRound, phase: 13 },
       { label: "Feature flags", Icon: Flag, phase: 13 },

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Clock, Eye } from "lucide-react";
 import { prisma } from "@/lib/prisma";
@@ -8,10 +9,12 @@ import { extractHeadings, renderMarkdown } from "@/lib/markdown";
 import { formatDate } from "@/lib/utils";
 import { getServerSession } from "@/lib/session";
 import { hasPermission } from "@/lib/rbac";
+import { hasPremiumAccess } from "@/lib/monetization";
 import { Container } from "@/components/ui/container";
 import { Badge } from "@/components/ui/badge";
 import { EngagementBar } from "@/components/articles/engagement-bar";
 import { CommentsSection } from "@/components/comments/comments-section";
+import { AdSlot } from "@/components/ads/ad-slot";
 import { ReadingExperience } from "@/components/articles/reading-experience";
 import { TableOfContents } from "@/components/articles/table-of-contents";
 import { ArticleCard } from "@/components/articles/article-card";
@@ -61,12 +64,21 @@ export default async function ArticlePage({ params }: Props) {
   const isLive = article.status === "published" ||
     (article.status === "scheduled" && article.scheduledFor && article.scheduledFor <= new Date());
 
-  // View counter + timestamped event for the trending engine (fire-and-forget)
+  // View counter + audience-enriched event for trending/analytics (fire-and-forget)
   if (isLive) {
     const articleId = article.id;
+    const h = await headers();
     Promise.all([
       prisma.article.update({ where: { id: articleId }, data: { views: { increment: 1 } } }),
-      prisma.viewEvent.create({ data: { articleId, userId: session?.user.id } }),
+      prisma.viewEvent.create({
+        data: {
+          articleId,
+          userId: session?.user.id,
+          userAgent: h.get("user-agent")?.slice(0, 250),
+          referrer: h.get("referer")?.slice(0, 250),
+          language: h.get("accept-language")?.split(",")[0]?.slice(0, 12),
+        },
+      }),
     ]).catch(() => {});
   }
 
@@ -111,7 +123,16 @@ export default async function ArticlePage({ params }: Props) {
     }),
   ]);
 
-  const headings = extractHeadings(article.content);
+  // Premium paywall: teaser only for readers without premium access
+  const premiumLocked =
+    article.isPremium &&
+    article.authorId !== userId &&
+    !(await hasPremiumAccess(userId, session?.user.role));
+  const visibleContent = premiumLocked
+    ? article.content.split(/\s+/).slice(0, 60).join(" ") + "…"
+    : article.content;
+
+  const headings = premiumLocked ? [] : extractHeadings(article.content);
   const updated =
     article.publishedAt &&
     article.updatedAt.getTime() - article.publishedAt.getTime() > 86_400_000;
@@ -122,7 +143,7 @@ export default async function ArticlePage({ params }: Props) {
       ? hasPermission(session.user.role, { article: ["updateOwn"] })
       : hasPermission(session.user.role, { article: ["update"] }));
 
-  const html = renderMarkdown(article.content);
+  const html = renderMarkdown(visibleContent);
 
   return (
     <article>
@@ -229,9 +250,44 @@ export default async function ArticlePage({ params }: Props) {
           <div className="mt-8 aspect-[16/9] rounded-xl bg-gradient-to-br from-secondary to-muted" />
         )}
 
+        {article.content.includes("/go/") && (
+          <p className="mt-6 rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+            Disclosure: this article contains affiliate links — we may earn a commission
+            at no extra cost to you.
+          </p>
+        )}
+
         <TableOfContents headings={headings} />
 
-        <div id="article-body" className="article-content mt-8" dangerouslySetInnerHTML={{ __html: html }} />
+        <div
+          id="article-body"
+          className={premiumLocked ? "article-content mt-8 [mask-image:linear-gradient(to_bottom,black_40%,transparent)]" : "article-content mt-8"}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+
+        {premiumLocked && (
+          <div className="-mt-6 rounded-xl border border-accent/40 bg-accent-soft/50 p-8 text-center">
+            <p className="font-serif text-xl font-bold">This is a premium article</p>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              Become a member to read the full story, unlock every premium article, and
+              enjoy a completely ad-free experience.
+            </p>
+            <Link
+              href="/membership"
+              className={buttonVariants({ variant: "accent" }) + " mt-5"}
+            >
+              Unlock with Premium
+            </Link>
+            {!session && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Already a member?{" "}
+                <Link href={`/login?next=/articles/${slug}`} className="text-accent hover:underline">
+                  Sign in
+                </Link>
+              </p>
+            )}
+          </div>
+        )}
 
         {article.tags.length > 0 && (
           <div className="mt-10 flex flex-wrap gap-2">
@@ -242,6 +298,8 @@ export default async function ArticlePage({ params }: Props) {
             ))}
           </div>
         )}
+
+        {!premiumLocked && <AdSlot placement="article_bottom" />}
 
         {article.allowComments ? (
           <CommentsSection articleId={article.id} session={session} />

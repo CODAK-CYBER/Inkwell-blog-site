@@ -38,21 +38,6 @@ export default async function SearchPage({ searchParams }: Props) {
     prisma.category.findMany({ orderBy: { sortOrder: "asc" }, select: { slug: true, name: true } }),
   ]);
 
-  // Record search history (deduped per hour), powering recent + trending searches.
-  if (query && query.length >= 2) {
-    const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    prisma.searchHistory
-      .findFirst({
-        where: { userId: session?.user.id ?? null, query, createdAt: { gte: hourAgo } },
-      })
-      .then((dup) =>
-        dup
-          ? null
-          : prisma.searchHistory.create({ data: { userId: session?.user.id, query } })
-      )
-      .catch(() => {});
-  }
-
   const results =
     query || hasFilters
       ? await prisma.article.findMany({
@@ -89,6 +74,24 @@ export default async function SearchPage({ searchParams }: Props) {
           take: 30,
         })
       : [];
+
+  // Record search history with result counts (deduped per hour) —
+  // zero-result queries feed the search-intelligence report.
+  if (query && query.length >= 2) {
+    const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    prisma.searchHistory
+      .findFirst({
+        where: { userId: session?.user.id ?? null, query, createdAt: { gte: hourAgo } },
+      })
+      .then((dup) =>
+        dup
+          ? null
+          : prisma.searchHistory.create({
+              data: { userId: session?.user.id, query, results: results.length },
+            })
+      )
+      .catch(() => {});
+  }
 
   return (
     <Container className="py-14">

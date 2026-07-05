@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { BreakingNews } from "@/components/layout/breaking-news";
 import { AnnouncementBanner } from "@/components/layout/announcement-banner";
+import { MaintenanceGate } from "@/components/layout/maintenance-gate";
 import { CookieConsent } from "@/components/cookie-consent";
 import "./globals.css";
 
@@ -77,7 +78,9 @@ export default function RootLayout({
           <AnnouncementBanner />
           <BreakingNews />
           <Header />
-          <main className="flex-1">{children}</main>
+          <main className="flex-1">
+            <MaintenanceGate>{children}</MaintenanceGate>
+          </main>
           <Footer />
           <CookieConsent />
         </ThemeProvider>

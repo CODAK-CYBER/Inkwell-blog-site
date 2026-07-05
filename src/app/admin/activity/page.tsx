@@ -7,8 +7,24 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export default async function AdminActivityPage() {
+interface Props {
+  searchParams: Promise<{ q?: string }>;
+}
+
+export default async function AdminActivityPage({ searchParams }: Props) {
+  const { q } = await searchParams;
+  const query = q?.trim() ?? "";
+
   const logs = await prisma.activityLog.findMany({
+    where: query
+      ? {
+          OR: [
+            { action: { contains: query } },
+            { detail: { contains: query } },
+            { user: { email: { contains: query } } },
+          ],
+        }
+      : {},
     orderBy: { createdAt: "desc" },
     take: 100,
     include: { user: { select: { name: true, email: true } } },
@@ -16,10 +32,27 @@ export default async function AdminActivityPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold">Activity logs</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-bold">Activity logs</h1>
+        <a
+          href="/api/admin/export?dataset=activity"
+          download
+          className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-secondary"
+        >
+          Export CSV
+        </a>
+      </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        The last 100 recorded actions across the platform.
+        The most recent 100 recorded actions{query && ` matching “${query}”`}.
       </p>
+      <form action="/admin/activity" method="GET" className="mt-3 max-w-sm">
+        <input
+          name="q"
+          defaultValue={query}
+          placeholder="Search action, detail or user email…"
+          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+      </form>
 
       <div className="mt-4 overflow-x-auto rounded-xl border">
         <table className="w-full min-w-[640px] text-sm">

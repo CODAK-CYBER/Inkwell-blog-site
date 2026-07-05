@@ -33,6 +33,16 @@ The app is Next.js full-stack: **most mutations are Server Actions** (type-safe 
 | `/feed.xml` | GET | RSS 2.0 feed (30 latest live articles). |
 | `/sitemap.xml`, `/robots.txt`, `/manifest.webmanifest` | GET | Generated SEO/PWA files. |
 
+### Monetization & admin ops
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/go/[code]` | GET | Cloaked affiliate redirect, click-tracked. |
+| `/api/ads/click/[id]` | GET | Ad click-through tracking → advertiser redirect. |
+| `/api/payments/callback` | GET | Flutterwave return URL — verifies the transaction server-to-server, fulfills idempotently, redirects with success/canceled/failed notice. |
+| `/api/payments/webhook` | POST | Flutterwave webhook (`verif-hash` checked against `FLUTTERWAVE_SECRET_HASH`); re-verifies then fulfills — guarantees delivery even if the customer never returns. |
+| `/api/admin/export` | GET | Admin CSV exports: `?dataset=users\|activity\|revenue`. |
+| `/api/admin/backups/[name]` | GET | Download a database backup (admin, allowlisted filenames). |
+
 ## Server Actions (by module in `src/lib/actions/`)
 
 | Module | Actions |
@@ -44,6 +54,9 @@ The app is Next.js full-stack: **most mutations are Server Actions** (type-safe 
 | `taxonomy.ts` | Categories (`saveCategory`, `deleteCategory`), tags (`createTag`, `deleteTag`, `mergeTags`), collections (`saveCollection`, `deleteCollection`, `toggleArticleInCollection`) |
 | `moderation.ts` | `resolveReport`, `setUserVerified`, announcements (`saveAnnouncement` + audience fan-out, `toggleAnnouncement`, `deleteAnnouncement`), `triggerWeeklyDigest` |
 | `notifications.ts` | `markNotificationRead`, `markAllNotificationsRead`, `deleteNotification`, `clearReadNotifications` |
+| `billing.ts` | `subscribe` / `donate` (return a Flutterwave `checkoutUrl` when keys are set; instant dev checkout otherwise), `cancelSubscription`, `adminSetSubscription` (comp/cancel) |
+| `ads.ts` | `saveAd`, `toggleAd`, `deleteAd`, `saveAffiliateLink`, `deleteAffiliateLink` |
+| `system.ts` | `updateSettings` (maintenance/toggles), `createBackup`, `listBackups`, `deleteBackup` |
 | `settings/actions.ts` (app dir) | `updateProfile`, `updateLocale`, `updateNotifications`, `updatePrivacy`, `updateInterests`, `becomeAuthor` — user fields go through `auth.api.updateUser` (cookie-cache refresh) |
 | `onboarding/actions.ts` (app dir) | `completeOnboarding` |
 

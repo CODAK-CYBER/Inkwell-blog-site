@@ -156,6 +156,17 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
+        before: async (user) => {
+          // Feature toggle: admins can close registration in Admin → Settings.
+          const { getSetting, settingIsOn } = await import("@/lib/settings");
+          const { APIError } = await import("better-auth");
+          if (!settingIsOn(await getSetting("registrationEnabled"))) {
+            throw new APIError("FORBIDDEN", {
+              message: "Registration is currently closed. Please try again later.",
+            });
+          }
+          return { data: user };
+        },
         after: async (user) => {
           // Bootstrap: the very first account becomes superadmin.
           try {

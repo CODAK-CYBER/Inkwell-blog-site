@@ -12,9 +12,9 @@ Status legend: ✅ complete · 🟡 partially covered by other phases · ⬜ not
 | 6 | Search Engine | 🟡 | Live suggestions, filters (category/tag/author/date), history, trending searches; Meilisearch upgrade optional later |
 | 7 | Community Features | ✅ | Comments, reactions, reports, achievements, verified users, share menu |
 | 8 | Notifications | ✅ | Notification center, event fan-out, announcements, weekly digest; push pending Phase 14 |
-| 9 | Admin Dashboard | 🟡 | Dashboard, articles, categories, tags, collections, media, users, moderation, calendar, communications, activity logs live; ads/analytics/revenue modules pending Phases 10–11 |
-| 10 | Revenue System | ⬜ | Memberships, premium paywall (flag exists), ads, sponsorships, donations |
-| 11 | Analytics | ⬜ | Per-article analytics exists; needs traffic sources, devices, countries, admin suite |
+| 9 | Admin Dashboard | ✅ | Full command center: exec dashboard w/ system health, settings + maintenance mode, security center, backups, warnings/notes, CSV exports — plus all earlier modules |
+| 10 | Revenue System | ✅ | Memberships + paywall, ads w/ tracking, affiliates, donations, revenue dashboard. **Flutterwave** checkout integrated (callback + webhook); dev checkout when keys absent |
+| 11 | Analytics | ✅ | DAU/MAU/retention, audience (device/browser/language/referrer), content/author/community/search intelligence, AI insights, forecasting. Countries need geo-IP (later) |
 | 12 | SEO System | 🟡 | Sitemap, robots, OG/Twitter meta, canonical, SEO score live; structured data + redirect manager pending |
 | 13 | Performance & Security | 🟡 | Rate limiting (auth), soft deletes, audit logs, file validation live; caching, backups, hardening pending |
 | 14 | Mobile Experience & PWA | ⬜ | Manifest exists; service worker, offline reading, push notifications pending |

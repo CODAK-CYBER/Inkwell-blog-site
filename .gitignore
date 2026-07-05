@@ -50,3 +50,6 @@ dev-emails/
 
 # local media uploads (dev storage)
 public/uploads/
+
+# local database backups
+backups/

@@ -66,6 +66,7 @@ export default async function AdminDashboardPage() {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+  const fifteenMinAgo = new Date(now.getTime() - 15 * 60 * 1000);
   const [
     totalUsers,
     activeUsers,
@@ -78,6 +79,12 @@ export default async function AdminDashboardPage() {
     mostViewed,
     pendingReview,
     recentActivity,
+    onlineUsers,
+    openReports,
+    flaggedComments,
+    activeSubs,
+    donationsSum,
+    mediaBytes,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.session.groupBy({ by: ["userId"], where: { expiresAt: { gt: now } } }).then((g) => g.length),
@@ -108,7 +115,20 @@ export default async function AdminDashboardPage() {
       take: 8,
       include: { user: { select: { name: true } } },
     }),
+    prisma.session
+      .groupBy({ by: ["userId"], where: { updatedAt: { gte: fifteenMinAgo }, expiresAt: { gt: now } } })
+      .then((g) => g.length),
+    prisma.report.count({ where: { status: "open" } }),
+    prisma.comment.count({ where: { status: "flagged" } }),
+    prisma.subscription.count({ where: { status: "active" } }),
+    prisma.donation.aggregate({ _sum: { amount: true } }),
+    prisma.media.aggregate({ where: { deletedAt: null }, _sum: { size: true } }),
   ]);
+
+  const moderationPending = openReports + flaggedComments;
+  const memoryMb = Math.round(process.memoryUsage().rss / 1024 / 1024);
+  const uptimeH = Math.floor(process.uptime() / 3600);
+  const uptimeM = Math.floor((process.uptime() % 3600) / 60);
 
   const statusCount = (s: string) =>
     articlesByStatus.find((r) => r.status === s)?._count ?? 0;
@@ -124,6 +144,9 @@ export default async function AdminDashboardPage() {
         </Link>
         <Link href="/admin/articles?status=pending" className={buttonVariants({ variant: "outline", size: "sm" })}>
           Review queue ({statusCount("pending")})
+        </Link>
+        <Link href="/admin/moderation" className={buttonVariants({ variant: "outline", size: "sm" })}>
+          Moderation ({moderationPending})
         </Link>
         <Link href="/admin/users" className={buttonVariants({ variant: "outline", size: "sm" })}>
           <UsersIcon className="size-4" />
@@ -145,17 +168,45 @@ export default async function AdminDashboardPage() {
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <StatCard label="Total users" value={totalUsers} sub={`${newUsersToday} new today`} />
-          <StatCard label="Active users" value={activeUsers} sub="with a live session" />
+          <StatCard label="Online now" value={onlineUsers} sub={`${activeUsers} with live sessions`} />
           <StatCard label="Total articles" value={totalArticles} />
           <StatCard label="Total views" value={(totalViews._sum.views ?? 0).toLocaleString()} />
           <StatCard label="Published" value={statusCount("published")} />
-          <StatCard label="Drafts" value={statusCount("draft")} />
           <StatCard label="Pending review" value={statusCount("pending")} />
+          <StatCard label="Moderation queue" value={moderationPending} sub={`${openReports} reports · ${flaggedComments} held`} />
           <StatCard label="Scheduled" value={statusCount("scheduled")} />
           <StatCard label="Likes" value={totalLikes} />
           <StatCard label="Bookmarks" value={totalBookmarks} />
-          <StatCard label="Comments" value="—" sub="arrives in Phase 7" />
-          <StatCard label="Revenue" value="—" sub="arrives in Phase 10" />
+          <StatCard label="Active memberships" value={activeSubs} />
+          <StatCard
+            label="Donations"
+            value={`$${((donationsSum._sum.amount ?? 0) / 100).toFixed(2)}`}
+          />
+        </div>
+      </section>
+
+      {/* System health */}
+      <section className="rounded-xl border bg-card p-5">
+        <h2 className="font-serif text-lg font-semibold">System health</h2>
+        <div className="mt-3 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">App uptime</p>
+            <p className="mt-0.5 font-medium">{uptimeH}h {uptimeM}m</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Memory (RSS)</p>
+            <p className="mt-0.5 font-medium">{memoryMb} MB</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Media storage</p>
+            <p className="mt-0.5 font-medium">
+              {((mediaBytes._sum.size ?? 0) / (1024 * 1024)).toFixed(1)} MB
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Database & API</p>
+            <p className="mt-0.5 font-medium text-accent">● Operational</p>
+          </div>
         </div>
       </section>
 

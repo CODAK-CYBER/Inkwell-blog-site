@@ -1,10 +1,10 @@
 # Project Status
 
-_Last updated: 2026-07-04 · Latest commit: `b1c4df4` (Phases 7–8)_
+_Last updated: 2026-07-04 · Phases 9–11 complete_
 
 ## Where the project stands
 
-**Complete: Phases 1, 2, 3, 4, 7, 8** — plus the core of Phase 9 (admin dashboard) pulled forward, and most of Phases 5 (homepage/discovery) and 6 (search) covered along the way. See [PROJECT_ROADMAP.md](PROJECT_ROADMAP.md) for the full phase map.
+**Complete: Phases 1, 2, 3, 4, 7, 8, 9, 10, 11** — with Phases 5 (homepage/discovery) and 6 (search) substantially covered along the way. Remaining: 12 (SEO polish), 13 (performance/security hardening), 14 (PWA), 15 (testing/deployment). See [PROJECT_ROADMAP.md](PROJECT_ROADMAP.md).
 
 The platform is a working product: readers register, personalize, read, react, comment, and get notified; authors write through a professional editor and editorial pipeline; admins run content, media, users, moderation, and communications from a real dashboard.
 
@@ -22,6 +22,11 @@ The platform is a working product: readers register, personalize, read, react, c
 | Notification center + fan-out (publish/reply/mention/follower/breaking) | ✅ Verified |
 | Announcements + sitewide banner, weekly digest | ✅ Verified |
 | RSS, sitemap, archive, editorial calendar, per-article analytics | ✅ Verified |
+| Maintenance mode, registration/comments toggles (enforced) | ✅ Verified |
+| Security center, warnings/notes, backups, CSV exports | ✅ Verified |
+| Memberships + premium paywall + ad-free for members | ✅ Verified (dev checkout) |
+| Ads (rotation + impression/click tracking), affiliates (/go/*), donations | ✅ Verified |
+| Analytics suite, AI insights, traffic forecast | ✅ Verified |
 
 ## Environment & operational notes
 
@@ -33,16 +38,17 @@ The platform is a working product: readers register, personalize, read, react, c
 
 ## Known gaps / deferred by design
 
+- **Payments**: Flutterwave is fully integrated (hosted checkout, verification callback, webhook). Until `FLUTTERWAVE_SECRET_KEY`/`FLUTTERWAVE_SECRET_HASH` are set in `.env`, checkout runs in instant dev mode without charging. Recurring billing note: Flutterwave charges are one-time — memberships last their paid period and members re-pay to renew (Flutterwave Payment Plans can automate renewals later)
 - Push notifications → Phase 14 (PWA)
+- Country-level analytics → needs a geo-IP service
 - Block-based editor (drag-drop blocks, slash commands, math) → would require TipTap migration; discuss before committing
-- Payment/membership enforcement of `isPremium` articles → Phase 10
-- Traffic sources / device / country analytics → Phase 11
-- Malware scanning, backups, content locking → Phase 13
-- Drag-and-drop category ordering & calendar scheduling → numeric ordering + editor scheduling work today
+- Malware scanning for uploads, content locking → Phase 13
+- Maintenance mode is a UX curtain (page data still present in the RSC payload) — real access control remains role-based
+- Custom role builder → roles are code-defined in `src/lib/permissions.ts` (adding one is a small edit, not a UI flow)
 
 ## Next steps (recommended order)
 
-1. **Phase 10 — Revenue**: membership plans, premium paywall (flag already exists), Stripe/Paystack, sponsored placements
-2. **Phase 11 — Analytics**: extend ViewEvent with referrer/device/country, admin analytics module
-3. **Phase 12 — SEO polish**: structured data (JSON-LD), OG image generation, redirect manager
-4. **Phases 13–15 — Hardening & launch**: rate limiting beyond auth, backups, PWA, tests, CI/CD, deploy (Vercel + Neon + Cloudinary + Resend domain)
+1. **Phase 12 — SEO polish**: structured data (JSON-LD), OG image generation, redirect manager
+2. **Phase 13 — Hardening**: broader rate limiting, upload scanning, caching, geo-IP
+3. **Phase 14 — PWA**: service worker, offline reading, push notifications
+4. **Phase 15 — Launch**: Flutterwave live keys + webhook URL, tests, CI/CD, deploy (Vercel + Neon + Cloudinary + Resend domain)

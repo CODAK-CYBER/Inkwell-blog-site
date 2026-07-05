@@ -24,6 +24,7 @@ A full-featured, community-driven publishing platform built with Next.js — thi
 | Auth | better-auth (sessions, OAuth, 2FA, admin plugin, custom RBAC) |
 | Email | Resend (dev fallback: local outbox in `dev-emails/`) |
 | Storage | Local disk in dev; Cloudinary via env keys |
+| Payments | Flutterwave (cards, bank transfer, USSD, mobile money); instant dev checkout without keys |
 
 ## Getting started
 
@@ -48,7 +49,7 @@ npm run dev                # http://localhost:3000
 
 ### Environment
 
-See [.env.example](.env.example) for all options: Resend (email), Google/GitHub/Apple OAuth, and Cloudinary (media storage). Everything works in dev with only `BETTER_AUTH_SECRET` set.
+See [.env.example](.env.example) for all options: Resend (email), Google/GitHub/Apple OAuth, Cloudinary (media storage), and Flutterwave (payments). Everything works in dev with only `BETTER_AUTH_SECRET` set.
 
 ## Key entry points
 

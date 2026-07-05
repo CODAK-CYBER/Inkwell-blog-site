@@ -3,9 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Ban, BadgeCheck, MoreHorizontal, ShieldCheck, Undo2 } from "lucide-react";
+import { AlertTriangle, Ban, BadgeCheck, MoreHorizontal, ShieldCheck, StickyNote, Undo2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
-import { setUserVerified } from "@/lib/actions/moderation";
+import { addUserNote, issueWarning, setUserVerified } from "@/lib/actions/moderation";
 import { ROLES } from "@/lib/constants";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -179,6 +179,26 @@ export function UserRow({ user, isSelf }: { user: AdminUser; isSelf: boolean }) 
                 >
                   <BadgeCheck className="size-4" />
                   {user.verified ? "Remove verification" : "Verify user"}
+                </button>
+                <button
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary"
+                  onClick={() => {
+                    const reason = window.prompt("Warning reason (the user will be notified):");
+                    if (reason) run(() => issueWarning(user.id, reason));
+                  }}
+                >
+                  <AlertTriangle className="size-4" />
+                  Issue warning
+                </button>
+                <button
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary"
+                  onClick={() => {
+                    const note = window.prompt("Internal note (staff-only, never shown to the user):");
+                    if (note) run(() => addUserNote(user.id, note));
+                  }}
+                >
+                  <StickyNote className="size-4" />
+                  Add internal note
                 </button>
                 <button
                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary"

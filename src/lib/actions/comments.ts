@@ -55,6 +55,11 @@ export async function addComment(articleId: string, content: string, parentId?: 
   const session = await requireSession();
   if (session.user.banned) return { error: "Your account can't comment right now." };
 
+  const { getSetting, settingIsOn } = await import("@/lib/settings");
+  if (!settingIsOn(await getSetting("commentsEnabled"))) {
+    return { error: "Commenting is temporarily disabled platform-wide." };
+  }
+
   const clean = content.trim();
   if (!clean) return { error: "Write something first." };
   if (clean.length > 3000) return { error: "Comments are limited to 3000 characters." };

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ArticleCard } from "@/components/articles/article-card";
 import { PersonalizedHome } from "@/components/home/personalized-home";
+import { AdSlot } from "@/components/ads/ad-slot";
 
 export default async function HomePage() {
   // Signed-in users finish onboarding before seeing the homepage.
@@ -64,6 +65,8 @@ export default async function HomePage() {
           </div>
         </Container>
       </section>
+
+      <AdSlot placement="home_banner" />
 
       {/* Featured */}
       {featured.length > 0 && (

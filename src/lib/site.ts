@@ -34,6 +34,8 @@ export const siteConfig = {
     ],
     company: [
       { label: "About", href: "/about" },
+      { label: "Membership", href: "/membership" },
+      { label: "Support Us", href: "/support" },
       { label: "Contact", href: "/contact" },
       { label: "Write for Us", href: "/contact" },
       { label: "Advertise", href: "/contact" },

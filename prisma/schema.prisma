@@ -309,12 +309,15 @@ model MediaUsage {
   @@map("media_usage")
 }
 
-// One row per page view — powers the time-windowed trending engine.
+// One row per page view — powers trending + audience analytics.
 model ViewEvent {
   id        String   @id @default(cuid())
   articleId String
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   userId    String? // no FK: kept anonymous-ish for analytics
+  userAgent String?
+  referrer  String?
+  language  String?
   createdAt DateTime @default(now())
 
   @@index([articleId, createdAt])
@@ -327,6 +330,7 @@ model SearchHistory {
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   query     String
+  results   Int? // result count — zero-result queries feed search intelligence
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
@@ -596,6 +600,93 @@ model Announcement {
 }
 
 // ------------------------------------------------------------------
+// Platform operations (Phase 9)
+// ------------------------------------------------------------------
+
+// Key-value platform configuration (maintenance mode, feature toggles, branding)
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("site_setting")
+}
+
+// Internal staff notes on a user (never shown to the user)
+model UserNote {
+  id        String   @id @default(cuid())
+  userId    String
+  authorId  String?
+  note      String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("user_note")
+}
+
+// Formal warnings (user is notified)
+model UserWarning {
+  id         String   @id @default(cuid())
+  userId     String
+  issuedById String?
+  reason     String
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("user_warning")
+}
+
+// ------------------------------------------------------------------
+// Monetization (Phase 10)
+// ------------------------------------------------------------------
+
+// Ad.placement: home_banner | article_bottom
+model Ad {
+  id          String    @id @default(cuid())
+  name        String
+  placement   String
+  imageUrl    String?
+  html        String? // custom embed (admin-entered, trusted)
+  targetUrl   String?
+  weight      Int       @default(1) // rotation weighting
+  active      Boolean   @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  impressions Int       @default(0)
+  clicks      Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([placement, active])
+  @@map("ad")
+}
+
+// Cloaked affiliate links: /go/{code} → targetUrl (click-tracked)
+model AffiliateLink {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  targetUrl String
+  clicks    Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("affiliate_link")
+}
+
+model Donation {
+  id        String   @id @default(cuid())
+  userId    String?
+  name      String? // display name for anonymous/guest donors
+  amount    Int // cents
+  message   String?
+  provider  String   @default("dev") // dev | flutterwave
+  txRef     String?  @unique // payment reference — webhook/callback idempotency
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("donation")
+}
+
+// ------------------------------------------------------------------
 // Future-proofing (Phases 3, 7, 10): dormant until those phases land
 // ------------------------------------------------------------------
 
@@ -628,7 +719,7 @@ model Subscription {
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan              String // free | premium_monthly | premium_yearly
   status            String // active | canceled | past_due | trialing
-  provider          String? // stripe | paystack | ...
+  provider          String? // flutterwave | dev | comp
   providerCustomerId String?
   currentPeriodEnd  DateTime?
   createdAt         DateTime  @default(now())

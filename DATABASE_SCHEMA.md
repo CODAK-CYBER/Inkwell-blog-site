@@ -62,14 +62,27 @@ Source of truth: [`prisma/schema.prisma`](prisma/schema.prisma). SQLite in dev, 
 | `NotificationPreferences` | Per-user channel + type toggles (email/in-app/push, digest, breaking, follower, login alerts) + per-category topics JSON |
 | `Announcement` | Admin broadcasts; `level`, `audience`, `showBanner`, `expiresAt` |
 
-## Platform
+## Platform operations (Phase 9)
 
 | Model | Purpose |
 | --- | --- |
-| `ActivityLog` | Audit trail of admin/editorial actions |
-| `Subscription` | Membership scaffold (plan, status, provider) — activates in Phase 10 |
+| `ActivityLog` | Audit trail of admin/editorial actions (searchable, CSV-exportable) |
+| `SiteSetting` | Key-value config: maintenance mode, registration/comments toggles, support email |
+| `UserNote` | Internal staff notes on users (never shown to the user) |
+| `UserWarning` | Formal warnings (user notified at critical priority) |
+
+## Monetization (Phase 10)
+
+| Model | Purpose |
+| --- | --- |
+| `Subscription` | Memberships: `plan`, `status`, `provider` (dev/comp until a payment provider is connected), `currentPeriodEnd` |
+| `Donation` | One-time contributions (amount in cents, message, provider) |
+| `Ad` | Placements (`home_banner`/`article_bottom`), image or HTML embed, weighted rotation, scheduling windows, impression/click counters |
+| `AffiliateLink` | Cloaked `/go/{code}` links with click tracking |
 | `LoyaltyTransaction` | Points scaffold — future gamification |
 | `Referral` | Referral codes scaffold |
+
+Analytics enrichment: `ViewEvent` also stores `userAgent`, `referrer`, `language`; `SearchHistory.results` records result counts (zero-result queries = content gaps).
 
 ## Conventions
 

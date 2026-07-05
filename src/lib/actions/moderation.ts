@@ -62,6 +62,50 @@ export async function setUserVerified(userId: string, verified: boolean) {
   return { success: true };
 }
 
+/** Internal staff note on a user (never shown to the user). */
+export async function addUserNote(userId: string, note: string) {
+  const session = await requireModerator();
+  const clean = note.trim();
+  if (!clean) return { error: "Note is empty." };
+  await prisma.userNote.create({
+    data: { userId, authorId: session.user.id, note: clean },
+  });
+  await logActivity({
+    userId: session.user.id,
+    action: "user.note_added",
+    targetType: "user",
+    targetId: userId,
+  });
+  revalidatePath("/admin/users");
+  return { success: true };
+}
+
+/** Formal warning — recorded and delivered to the user as a critical notification. */
+export async function issueWarning(userId: string, reason: string) {
+  const session = await requireModerator();
+  const clean = reason.trim();
+  if (!clean) return { error: "Give the warning a reason." };
+  await prisma.userWarning.create({
+    data: { userId, issuedById: session.user.id, reason: clean },
+  });
+  await notify({
+    userIds: [userId],
+    type: "security",
+    title: "⚠️ You have received a formal warning",
+    body: clean,
+    priority: "critical",
+  });
+  await logActivity({
+    userId: session.user.id,
+    action: "user.warned",
+    targetType: "user",
+    targetId: userId,
+    detail: clean.slice(0, 80),
+  });
+  revalidatePath("/admin/security");
+  return { success: true };
+}
+
 // ---------------- Announcements ----------------
 
 export interface AnnouncementInput {
